@@ -1,0 +1,25 @@
+{% extends 'base.html' %}{% block content %}
+<a class="back-link" href="/labs">‹ 연구실</a>
+<h1>연구실 생성</h1>
+<p>서버 관리자가 준비한 구성을 확인하고 적용합니다.</p>
+{% for p in changes.plans %}
+<section class="card card-pad"><h2>{{p.title}}</h2>
+<table><tbody>
+<tr><th>연구실 ID</th><td>{{p.id}}</td></tr>
+<tr><th>계정</th><td>{{p.user}}</td></tr>
+<tr><th>GPU</th><td>{{p.index}}</td></tr>
+<tr><th>연구실 공유 저장공간</th><td>{{p.storage_gb}} GB</td></tr>
+<tr><th>CPU · 시스템 메모리</th><td>공유 사용</td></tr>
+<tr><th>SSH 포트</th><td>{{p.port}}</td></tr>
+<tr><th>교체 대상</th><td>{{p.replace or '—'}}</td></tr>
+</tbody></table>
+{% if p.replace %}<p>새 환경이 시작되면 기존 시험 계정과 저장공간을 제거합니다. 기존 파일은 복구용 보관본으로 남깁니다.</p>{% endif %}
+<form method="post"><input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="plan" value="{{p.id}}">
+<label for="confirm-{{p.id}}">연구실 ID를 입력하여 확인</label><input id="confirm-{{p.id}}" name="confirm" required autocomplete="off">
+<button>구성 적용</button></form></section>
+{% else %}<p>적용 대기 중인 구성이 없습니다.</p>{% endfor %}
+<section class="card card-pad"><h2>진행 상태</h2><div id="provision-jobs">
+{% for j in changes.jobs %}<p>{{j.lab}} · {{j.state}} · {{j.message}}</p>{% else %}<p>작업 없음</p>{% endfor %}
+</div></section>
+<script defer src="/static/provision.js"></script>
+{% endblock %}

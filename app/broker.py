@@ -296,6 +296,15 @@ class Handler(socketserver.StreamRequestHandler):
                     import hotops
 
                     result = hotops.catalog()
+                elif req.get("action") in {"provision_plans", "provision_submit"}:
+                    import lifecycle
+
+                    result = (
+                        lifecycle.plans()
+                        if req["action"] == "provision_plans"
+                        else lifecycle.submit(req)
+                    )
+                    CACHE.clear()
                 elif req.get("action") in {
                     "resources",
                     "backup",

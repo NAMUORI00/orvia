@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.5.1")
+    return jsonify(status="ok", version="0.5.2")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -260,6 +260,31 @@ def lab_page(lab_id, section="overview"):
 @app.get("/activity")
 def activity_page():
     return render_template("activity.html", data=call({"action": "status"}))
+
+
+@app.route("/provision", methods=["GET", "POST"])
+def provision_page():
+    if request.method == "POST":
+        try:
+            result = call(
+                dict(
+                    action="provision_submit",
+                    plan=request.form.get("plan"),
+                    confirm=request.form.get("confirm"),
+                )
+            )
+            flash(result["message"], "success")
+        except (ValueError, OSError) as exc:
+            flash(str(exc), "error")
+        return redirect("/provision")
+    return render_template(
+        "provision.html", changes=call({"action": "provision_plans"})
+    )
+
+
+@app.get("/api/provision")
+def provision_status():
+    return jsonify(call({"action": "provision_plans"}))
 
 
 @app.get("/api/catalog")
