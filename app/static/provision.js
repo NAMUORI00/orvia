@@ -1,4 +1,12 @@
 (() => {
+  document.querySelectorAll('[data-storage-root]').forEach(input => {
+    const preview = input.form.querySelector('[data-storage-preview]');
+    input.addEventListener('input', () => {
+      preview.textContent = /^[a-z][a-z0-9_-]{1,31}$/.test(input.value)
+        ? input.dataset.storageRoot.replace(/\/$/, '') + '/' + input.value
+        : (typeof tr === 'function' ? tr('유효한 폴더명을 입력하세요.') : '유효한 폴더명을 입력하세요.');
+    });
+  });
   async function update() {
     if (!document.hidden) {
       try {

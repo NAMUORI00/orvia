@@ -1,7 +1,7 @@
 # Administrator-approved provisioning
 
 The `/provision` screen executes a host administrator's pre-approved plan.
-It does not accept arbitrary image, path or shell parameters from the browser.
+It accepts a storage folder name under the configured storage root, but no arbitrary image, absolute path or shell parameters from the browser.
 Existing imported laboratories remain protected by the GPU and lab allowlists.
 
 The administrator installs mode-600, root-owned JSON files under
@@ -33,3 +33,9 @@ Recovery timers verify the backing storage and the existing container, restore
 scoped network rules and start the container if stopped. They never recreate
 containers. Full host reboot and fresh-server provisioning require separate
 validation before being claimed as tested.
+
+## Storage folder names
+
+An optional `storage_name` defaults to the lab ID. The creation form can override it with 2–32 lowercase letters, digits, hyphens or underscores, beginning with a letter. Both folder and `.ext4` filename are checked for collisions, including dangling symlinks, before submission and again before allocation. Lab identity and container naming remain separate from the storage folder.
+
+Existing lab storage paths and backing files are visible on the storage page, but are not editable. This feature does not rename live mounts, relocate data or recreate existing containers.

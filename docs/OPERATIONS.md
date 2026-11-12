@@ -29,8 +29,14 @@ The dashboard uses its own administrator hash; it is not PAM/LDAP/Linux-group SS
 ## Known limitations
 
 - No hot GPU add/remove or base-image replacement.
-- No container creation/recreation.
+- Creation uses root-approved plans. Same-configuration recreation is available only for managed read-only environments.
 - Conditional internal account addition has guard tests but has not been live-tested on a writable production container.
 - Account additions inside a shared container share that container's resources; they are not separate isolated environments.
 - No backup retention scheduler, download endpoint or automated restore.
 - No fresh-host installation validation beyond preflight on the tested server.
+
+## Environment maintenance
+
+The laboratory Advanced > Environment management page supports an explicitly confirmed single-user restart and same-configuration recreation. Both interrupt running work, SSH sessions, memory and temporary files. Persistent storage bindings remain unchanged. GPU/image/path migration is not performed by these controls.
+
+Recreation pins the current image digest and preserves the inspected configuration, ports, GPU, mounts and resource limits. Writable roots, volumes outside the lab storage, multi-user containers and static IP configurations are rejected. The old container is stopped and retained with a rollback suffix; it is excluded from registration candidates. Creation or verification failure triggers rollback. Root-only records under `/var/lib/h200-console/maintenance` retain the original configuration. If the broker or host itself fails mid-operation, inspect these records; crash recovery is not automatic. Retained containers share persistent files and do not constitute backups.

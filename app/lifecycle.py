@@ -1,7 +1,8 @@
 """Execute root-approved, single-GPU provisioning plans from the console.
 
 Plans are installed out of band by the host administrator. Browser requests can
-only select an existing plan ID; they cannot choose paths, commands or images.
+select an existing plan ID and a validated folder name under the configured
+storage root; they cannot choose arbitrary paths, commands or images.
 Credentials never appear in the public plan or job result.
 """
 
@@ -49,14 +50,37 @@ def plans():
                     "storage_gb",
                     "port",
                     "replace",
+                    "storage_name",
                 )
             }
         )
     jobs = hotops.catalog()["jobs"]
-    return dict(plans=result, jobs=[j for j in jobs if j.get("kind") == "provision"])
+    return dict(
+        plans=result,
+        jobs=[j for j in jobs if j.get("kind") == "provision"],
+        storage_root=hotops.cfg().get("provision_root", ""),
+    )
+
+
+def storage_name(p):
+    value = p.get("storage_name") or p["id"]
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{1,31}", value):
+        raise ValueError(
+            "저장 폴더명은 영문 소문자로 시작하는 2~32자의 영문·숫자·하이픈·밑줄만 사용할 수 있습니다."
+        )
+    return value
+
+
+def storage_paths(root, p):
+    name = storage_name(p)
+    base, disk = root / name, root / (name + ".ext4")
+    if any(path.exists() or path.is_symlink() for path in (base, disk)):
+        raise ValueError("이미 사용 중인 저장 폴더명입니다. 다른 이름을 입력하세요.")
+    return base, disk
 
 
 def validate(p, c):
+    storage_name(p)
     if not re.fullmatch(r"[a-z][a-z0-9-]{2,23}", p["id"]):
         raise ValueError("Invalid lab ID")
     if not re.fullmatch(r"[a-z][a-z0-9_]{1,30}", p["user"]):
@@ -87,9 +111,15 @@ def validate(p, c):
 def submit(req):
     key = req.get("plan", "")
     p = read_plan(key)
+    if req.get("storage_name") is not None:
+        p["storage_name"] = req["storage_name"]
+        if not p["storage_name"]:
+            raise ValueError("저장 폴더명을 입력하세요.")
     if req.get("confirm") != p["id"]:
         raise ValueError("Enter the new lab ID to confirm")
-    validate(p, hotops.cfg())
+    c = hotops.cfg()
+    validate(p, c)
+    storage_paths(pathlib.Path(c["provision_root"]), p)
     if not hotops.JOB_LOCK.acquire(blocking=False):
         raise ValueError("Another storage operation is running")
     job = dict(
@@ -205,9 +235,7 @@ def worker(p, job):
         root = pathlib.Path(c["provision_root"]).resolve()
         if not root.is_dir() or root.is_symlink():
             raise ValueError("Provisioning root is not available")
-        base, disk = root / p["id"], root / (p["id"] + ".ext4")
-        if base.exists() or disk.exists():
-            raise ValueError("Storage already exists; inspect before retrying")
+        base, disk = storage_paths(root, p)
         total = int(p["storage_gb"]) * 10**9
         if shutil.disk_usage(root).free < total + 100 * 10**9:
             raise ValueError("Insufficient free space")

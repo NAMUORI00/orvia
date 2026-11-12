@@ -23,12 +23,14 @@
       const add = (label, value) =>
         list.append(node("dt", label), node("dd", String(value)));
       add("대상 연구실", form.dataset.labTitle || fields.get("lab"));
+      if (form.dataset.impact) add("적용 방식", form.dataset.impact);
       for (const [key, label] of [
         ["user", "대상 사용자"],
         ["title", "연구실 이름"],
         ["cpu", "CPU 한도"],
         ["ram", "메모리 한도"],
         ["size_gb", "변경 용량"],
+        ["storage_name", "저장 폴더명"],
       ])
         if (fields.get(key))
           add(
@@ -47,7 +49,7 @@
       const buttons = document.createElement("div");
       buttons.className = "review-actions";
       const back = node("button", "취소"),
-        apply = node("button", "적용");
+        apply = node("button", form.dataset.submitLabel || "적용");
       back.type = apply.type = "button";
       back.className = "secondary";
       buttons.append(back, apply);

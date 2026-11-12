@@ -466,3 +466,5 @@ footer {
     transition: none;
   }
 }
+
+.storage-location {display:grid;grid-template-columns:130px 1fr;gap:12px;padding:16px;background:#f1f6f7;border-radius:10px}.storage-location dd {margin:0;overflow-wrap:anywhere}.storage-location dt {color:#647d89}

@@ -80,6 +80,7 @@ def catalog():
                     image=o["Config"]["Image"],
                     readonly=h.get("ReadonlyRootfs", False),
                     id=o["Id"][:12],
+                    started=o["State"]["StartedAt"],
                     root_access=not h.get("ReadonlyRootfs", False),
                 )
             )
@@ -107,7 +108,7 @@ def catalog():
     available = []
     for o in all_objects:
         n = o["Name"].lstrip("/")
-        if n not in known:
+        if n not in known and "-rollback-" not in n:
             available.append(
                 dict(
                     name=n,
@@ -119,7 +120,18 @@ def catalog():
                     ],
                 )
             )
+    maintenance = []
+    for path in sorted(
+        (STATE / "maintenance").glob("*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )[:20]:
+        record = json.loads(path.read_text())
+        maintenance.append(
+            {k: record.get(k) for k in ["id", "lab", "user", "state", "time"]}
+        )
     return dict(
+        maintenance=maintenance,
         labs=result,
         jobs=jobs,
         profiles=drafts,
@@ -176,6 +188,36 @@ def dispatch(req):
         save(p, profiles)
         return {"message": "프리셋을 저장했습니다. 실행 환경은 변경하지 않았습니다."}
     c, s, u, o = authorize(req)
+    if req["action"] == "maintenance_recreate":
+        import maintenance
+
+        return maintenance.recreate(req, c, s, u, o)
+    if req["action"] == "maintenance_restart":
+        if req.get("ack_downtime") != "yes":
+            raise ValueError("실행 작업 중단을 확인해야 재시작할 수 있습니다.")
+        if (
+            req.get("expected_id") != o["Id"][:12]
+            or req.get("expected_started") != o["State"]["StartedAt"]
+        ):
+            raise ValueError("환경 상태가 변경되었습니다. 화면을 새로 열어 확인하세요.")
+        if not JOB_LOCK.acquire(blocking=False):
+            raise ValueError("다른 관리 작업이 진행 중입니다. 완료 후 다시 시도하세요.")
+        try:
+            run("docker", "restart", "--time", "15", name(s, u), timeout=90)
+            after = obj(name(s, u))
+            if (
+                after["Id"] != o["Id"]
+                or after["Mounts"] != o["Mounts"]
+                or not after["State"]["Running"]
+            ):
+                raise ValueError(
+                    "재시작 후 상태 확인이 필요합니다. 작업 기록을 확인하세요."
+                )
+            return {
+                "message": "선택한 사용자 환경을 재시작했습니다. 저장 경로는 유지됩니다."
+            }
+        finally:
+            JOB_LOCK.release()
     if req["action"] == "resources":
         cpu = float(req.get("cpu", 0))
         ram = int(req.get("ram", 0))

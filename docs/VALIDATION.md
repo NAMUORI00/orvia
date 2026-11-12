@@ -28,3 +28,10 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - All eight running researcher containers retained IDs and start timestamps. No researcher resource settings were changed during UI verification.
 - 22 boundary/localization/metadata tests passed. Metadata editing preserves resource definitions and issues no Docker commands.
 - GPU/image replacement remains disabled. Creation remains a root-prepared plan workflow. This release does not claim general lossless migration or full production lifecycle automation.
+
+## 0.5.4 storage naming and maintenance
+
+- 36 unit tests cover path traversal, existing storage and symlink rejection, protected labs, stale identity, downtime acknowledgement and immutable recreation payload preservation.
+- An isolated GPU 0 test container on a disposable ext4 filesystem was recreated with its data intact. A deliberately failed new-container start restored the original container and preserved the same file.
+- Production laboratory containers were not restarted or recreated. Full host/broker crash recovery remains untested and requires administrator inspection.
+- Restart persistence passed on the same disposable environment. Browser checks covered current storage paths, Korean/English maintenance screens, and recreation confirmation cancellation; no browser errors were observed. All eight production container IDs and start timestamps remained unchanged. Disposable containers, mount, disk and units were removed.

@@ -124,6 +124,8 @@ def snapshot():
             dict(
                 id=key,
                 title=s["title"],
+                storage_path=s["storage"],
+                storage_file=s.get("disk", ""),
                 gpu=s["index"],
                 gpu_indices=s.get("indices", [s["index"]]),
                 managed=s.get("managed", False),
@@ -307,6 +309,8 @@ class Handler(socketserver.StreamRequestHandler):
                     CACHE.clear()
                 elif req.get("action") in {
                     "metadata",
+                    "maintenance_restart",
+                    "maintenance_recreate",
                     "resources",
                     "backup",
                     "adduser",

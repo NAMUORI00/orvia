@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.5.3")
+    return jsonify(status="ok", version="0.5.4")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -236,6 +236,7 @@ def lab_page(lab_id, section="overview"):
         storage="공유 저장공간",
         images="환경 템플릿",
         backups="백업",
+        maintenance="환경 관리",
     )
     if section not in titles:
         abort(404)
@@ -270,6 +271,7 @@ def provision_page():
                 dict(
                     action="provision_submit",
                     plan=request.form.get("plan"),
+                    storage_name=request.form.get("storage_name"),
                     confirm=request.form.get("confirm"),
                 )
             )
@@ -305,6 +307,10 @@ def images_api(provider):
 @app.post("/hot-action")
 def hot_action():
     fields = [
+        "ack_downtime",
+        "ack_recreate",
+        "expected_id",
+        "expected_started",
         "title",
         "action",
         "lab",
@@ -327,6 +333,8 @@ def hot_action():
     except (ValueError, OSError) as e:
         flash(str(e), "error")
     target = {
+        "maintenance_restart": "maintenance",
+        "maintenance_recreate": "maintenance",
         "resources": "limits",
         "backup": "backups",
         "adduser": "accounts",
