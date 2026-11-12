@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.5.2")
+    return jsonify(status="ok", version="0.5.3")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -230,11 +230,11 @@ def lab_page(lab_id, section="overview"):
     titles = dict(
         overview="연구실 설정",
         accounts="계정",
-        resources="자원 설정",
-        limits="CPU·메모리 조정",
+        resources="자원 배정",
+        limits="CPU·메모리 할당",
         gpu="GPU",
         storage="공유 저장공간",
-        images="이미지 프리셋",
+        images="환경 템플릿",
         backups="백업",
     )
     if section not in titles:
@@ -305,6 +305,7 @@ def images_api(provider):
 @app.post("/hot-action")
 def hot_action():
     fields = [
+        "title",
         "action",
         "lab",
         "user",

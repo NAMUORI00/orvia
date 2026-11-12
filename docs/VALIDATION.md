@@ -20,3 +20,11 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - The new account was stopped and started through its recovery service; home files persisted. No host reboot was performed.
 - Retiring an old test mount exposed a legacy broker Requires dependency. The unit was repaired and cleanup completed; provisioning now rejects this dependency before allocating storage.
 - This is a root-prepared plan workflow, not an unrestricted browser installation wizard.
+
+## 0.5.3 visual resource map
+
+- Live server rack slots connect to assigned laboratories; unassigned GPUs are distinct from idle assigned GPUs.
+- Browser checks covered GPU/lab selection, the unassigned GPU panel, Korean/English labels, change review and cancellation. No browser console errors were observed.
+- All eight running researcher containers retained IDs and start timestamps. No researcher resource settings were changed during UI verification.
+- 22 boundary/localization/metadata tests passed. Metadata editing preserves resource definitions and issues no Docker commands.
+- GPU/image replacement remains disabled. Creation remains a root-prepared plan workflow. This release does not claim general lossless migration or full production lifecycle automation.

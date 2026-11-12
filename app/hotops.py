@@ -129,6 +129,24 @@ def catalog():
 
 
 def dispatch(req):
+    if req.get("action") == "metadata":
+        c = cfg()
+        lab = req.get("lab")
+        spec = c["labs"].get(lab)
+        if not spec or lab not in c["write_labs"] or spec["gpu"] not in c["write_gpus"]:
+            raise PermissionError("이 연구실은 현재 변경 보호 대상입니다.")
+        title = str(req.get("title") or "").strip()
+        if (
+            req.get("confirm") != lab
+            or not 1 <= len(title) <= 100
+            or any(ord(ch) < 32 for ch in title)
+        ):
+            raise ValueError("연구실 이름과 대상을 확인하세요.")
+        spec["title"] = title
+        save(ETC / "policy.json", c)
+        return {
+            "message": "연구실 이름을 저장했습니다. 사용자와 실행 작업은 유지됩니다."
+        }
     if req.get("action") == "register":
         return register(req)
     if req.get("action") == "profile_save":

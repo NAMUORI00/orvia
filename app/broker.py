@@ -306,6 +306,7 @@ class Handler(socketserver.StreamRequestHandler):
                     )
                     CACHE.clear()
                 elif req.get("action") in {
+                    "metadata",
                     "resources",
                     "backup",
                     "adduser",
