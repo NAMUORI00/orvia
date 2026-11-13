@@ -11,7 +11,7 @@
 <h2>사용할 Docker 이미지</h2>
 <label class="official-mode"><input type="radio" name="image_mode" value="official" checked>공식 공급자 이미지</label>
 <div id="official-images">
-<div class="official-base-cards">{% for item in environment_templates.bases %}<button type="button" class="official-base" data-base-provider="{{item.provider}}" data-base-tag="{{item.tag}}"><span class="choice-icon" aria-hidden="true">▣</span><strong>{{item.label}}</strong><small>현재 연구실에서 사용한 공식 베이스</small></button>{% endfor %}</div>
+<div class="creation-summary" aria-live="polite"><small>선택한 이미지</small><strong id="selected-official-image"></strong></div><details class="wizard-advanced"><summary>기존 연구실 기반 이미지</summary><div class="official-base-cards">{% for item in environment_templates.bases %}<button type="button" class="official-base" data-base-provider="{{item.provider}}" data-base-tag="{{item.tag}}"><span class="choice-icon" aria-hidden="true">▣</span><strong>{{item.label}}</strong><small>현재 연구실에서 사용한 공식 베이스</small></button>{% endfor %}</div></details>
 <p>공식 베이스에 SSH·Python 기본 도구를 구성합니다. Conda·추가 라이브러리는 베이스 이미지와 별도입니다.</p>
 <div class="form-grid"><div><label for="provision-provider">공급자</label><select id="provision-provider" name="image_provider"><option value="cuda">NVIDIA CUDA · Docker Hub</option><option value="pytorch">NVIDIA PyTorch · NGC</option></select></div><div><label for="provision-tag">이미지 버전</label><select id="provision-tag" name="image_tag" disabled></select></div></div><p id="provision-catalog-status" role="status"></p>
 </div>

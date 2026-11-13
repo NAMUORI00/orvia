@@ -170,10 +170,21 @@
     let catalogRequest = 0;
     let preferredTag =
       form.querySelector("[data-base-tag]")?.dataset.baseTag || "";
+    function selectedImage() {
+      const repo = provider.value === "cuda" ? "nvidia/cuda" : "nvcr.io/nvidia/pytorch";
+      document.getElementById("selected-official-image").textContent =
+        repo + (tag.value ? ":" + tag.value : " · " + tr("이미지 버전 선택"));
+      form.querySelectorAll("[data-base-tag]").forEach((button) => {
+        const active = button.dataset.baseProvider === provider.value && button.dataset.baseTag === tag.value;
+        button.setAttribute("aria-pressed", String(active));
+      });
+    }
+    tag.onchange = () => { preferredTag = tag.value; selectedImage(); };
     async function loadTags() {
       const seq = ++catalogRequest;
       tag.replaceChildren();
       tag.disabled = true;
+      selectedImage();
       catalogStatus.textContent = tr("공식 목록 조회 중");
       try {
         const res = await fetch("/api/images/" + provider.value);
@@ -201,11 +212,14 @@
           form.elements.image_mode.value !== "official" || !items.length;
         if ([...tag.options].some((o) => o.value === preferredTag))
           tag.value = preferredTag;
+        selectedImage();
         catalogStatus.textContent =
           tr(data.error || (data.stale ? "캐시된 목록" : "공식 목록")) +
           " · " +
           items.length;
       } catch (_) {
+        if (seq !== catalogRequest) return;
+        selectedImage();
         catalogStatus.textContent = tr("공식 목록 조회 실패");
       }
     }
