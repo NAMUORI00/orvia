@@ -50,3 +50,10 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Storage tests verify hidden-cache inclusion, symlink exclusion, hard-link deduplication, sparse-file block accounting and explicit partial results. Telemetry tests verify interface counter parsing and edge-triggered event records.
 - Hardware/traffic rates are recorded from deployment onward. Seven-day retention and historical-window queries are configured; seven elapsed days of operation have not been observed at release.
 - Existing account container IDs and start timestamps are compared before and after deployment.
+
+## 0.6.1 overview-first interaction
+
+- Operational overview uses four resource trend charts and account activity tiles. Numerical readings appear on pointer hover, touch or keyboard focus; account selection opens details.
+- Storage overview shows capacity and account shares before revealing a selected account's paths. Hardware, events and measurement notes remain available through explicit actions.
+- Browser verification covered keyboard chart readings, account details and storage path drill-down against live read-only metrics. Collection intervals and retention are unchanged.
+- The 65 Linux unit tests passed. Existing research containers are preserved during dashboard-only deployment.

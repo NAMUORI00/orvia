@@ -70,6 +70,7 @@
           el("i", undefined, "gpu-led"),
           el("span", "GPU " + gpu.index),
           el("small", ""),
+          el("progress", undefined, "gpu-activity-meter"),
         );
         n.addEventListener("click", () => {
           const labs = owners(gpu.index);
@@ -92,8 +93,11 @@
       n.classList.toggle("selected", !!active);
       n.setAttribute("aria-pressed", String(!!active));
       n.querySelector("small").textContent = assigned
-        ? gpu.util + "%"
+        ? t(gpu.util > 0 ? "사용 중" : "대기")
         : t(gpu.util > 0 || gpu.used > 32 ? "사용 확인" : "미배정");
+      const activity = n.querySelector('.gpu-activity-meter');
+      activity.max=100;activity.value=gpu.util;activity.setAttribute('aria-label',t('GPU 사용률'));
+      window.OrviaViz.hint(n, 'GPU '+gpu.index+' · '+gpu.util+'%\n'+gpu.used+' / '+gpu.total+' MiB · '+gpu.temp+' °C');
       n.setAttribute(
         "aria-label",
         "GPU " +
@@ -119,7 +123,8 @@
       const meter = n.querySelector('progress');
       meter.max = Math.max(Number(lab.storage_gb),1); meter.value = lab.used_gb;
       meter.setAttribute('aria-label',t('저장공간 사용량'));
-      n.querySelector('.lab-storage-label').textContent = t('공유 저장공간') + ' · ' + capacity(lab.used_gb) + ' / ' + capacity(lab.storage_gb);
+      n.querySelector('.lab-storage-label').textContent = t('공유 저장공간');
+      window.OrviaViz.hint(n,lab.title+'\n'+capacity(lab.used_gb)+' / '+capacity(lab.storage_gb));
       n.querySelector("small").textContent =
         "GPU " +
         indices(lab).join(", ") +
@@ -146,8 +151,10 @@
     document.getElementById("twin-free").textContent = data.gpus.filter(
       (g) => !owners(g.index).length,
     ).length;
-    document.getElementById("twin-memory").textContent =
-      data.memory_used_gib + " / " + data.memory_total_gib + " GiB";
+    const memory = document.getElementById("twin-memory");
+    memory.max=data.memory_total_gib;memory.value=data.memory_used_gib;
+    window.OrviaViz.hint(memory, data.memory_used_gib+" / "+data.memory_total_gib+" GiB");
+    memory.onclick=e=>window.OrviaViz.show(data.memory_used_gib+" / "+data.memory_total_gib+" GiB",memory,e);
     document.getElementById("twin-time").textContent = data.updated;
     details(activeLab);
     requestAnimationFrame(wires);

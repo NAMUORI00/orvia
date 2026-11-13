@@ -129,3 +129,321 @@
   align-items: center;
   gap: 8px;
 }
+
+.metric-tooltip {
+  position: fixed;
+  z-index: 10000;
+  background: #17343e;
+  color: #fff;
+  padding: 11px 15px;
+  border-radius: 9px;
+  box-shadow: 0 8px 30px #122f4330;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-line;
+  max-width: min(340px, calc(100vw - 16px));
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.metric-tooltip[hidden] {
+  display: none;
+}
+.monitor-tools {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.monitor-tools label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.monitor-tools select {
+  width: auto;
+  min-width: 130px;
+  margin: 0;
+}
+.monitor-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 12px;
+  color: #71878f;
+  margin-bottom: 20px;
+}
+.health-pill {
+  background: #e6f4ee;
+  color: #237660;
+  border: 1px solid #c6e4d7;
+  border-radius: 30px;
+  font-size: 12px;
+  padding: 9px 15px;
+}
+.health-pill.attention {
+  background: #fff3dd;
+  color: #936119;
+  border-color: #ead5aa;
+}
+.overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.metric-card {
+  background: #fff;
+  border: 1px solid #dfe8eb;
+  border-radius: 13px;
+  padding: 18px 20px;
+  min-width: 0;
+}
+.metric-title {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #31515c;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.insight-chart {
+  display: block;
+  width: 100%;
+  height: 90px;
+  margin: 15px 0 7px;
+  cursor: crosshair;
+  overflow: visible;
+}
+.insight-chart:focus-visible,
+#usage-gauge:focus-visible {
+  outline: 2px solid #238a78;
+  outline-offset: 4px;
+}
+.metric-caption {
+  font-size: 11px;
+  color: #71878f;
+}
+.account-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.account-tile {
+  padding: 14px 16px;
+  border: 1px solid #e2e9ed;
+  border-radius: 10px;
+  background: #fbfdfd;
+  min-width: 0;
+}
+.account-select {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #264653;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+.account-select strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-arrow {
+  margin-left: auto;
+  color: #6f9695;
+}
+.presence {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #a4afb8;
+}
+.presence.online {
+  background: #2e9982;
+  box-shadow: 0 0 0 3px #e6f5f0;
+}
+.presence.offline {
+  background: #cc8d4a;
+}
+.account-tile .insight-chart {
+  height: 42px;
+  margin: 9px 0 4px;
+}
+.account-overview h2 {
+  font-size: 16px;
+  margin: 0 0 15px;
+}
+.account-overview .usage-heading > span {
+  font-size: 12px;
+}
+.monitor-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.monitor-actions button {
+  font-size: 12px;
+}
+.insight-dialog {
+  width: min(780px, calc(100vw - 32px));
+  max-height: 85vh;
+  overflow: auto;
+  border: 1px solid #d5e2e7;
+  border-radius: 16px;
+  padding: 25px;
+  color: #24424e;
+  box-shadow: 0 25px 100px #10293340;
+}
+.insight-dialog::backdrop {
+  background: #102f4260;
+  backdrop-filter: blur(3px);
+}
+.insight-dialog h2 {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.insight-dialog h3 {
+  font-size: 14px;
+}
+.insight-dialog .insight-chart {
+  height: 150px;
+}
+.detail-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.detail-value {
+  background: #f3f7f9;
+  border-radius: 9px;
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+.detail-value dt {
+  font-size: 11px;
+  color: #6c818b;
+}
+.detail-value dd {
+  margin: 7px 0 0;
+  font-size: 14px;
+}
+.storage-overview {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  align-items: center;
+  gap: 30px;
+  padding: 12px 0;
+}
+.storage-gauge {
+  text-align: center;
+}
+.storage-gauge > svg {
+  width: 170px;
+  height: 170px;
+  display: block;
+  margin: auto;
+  cursor: crosshair;
+}
+.storage-gauge > button {
+  font-size: 12px;
+}
+.storage-distribution {
+  min-width: 0;
+}
+.storage-distribution h3 {
+  font-size: 14px;
+}
+.storage-distribution #usage-allocation {
+  height: 90px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.storage-distribution .usage-accounts {
+  margin-bottom: 10px;
+}
+.storage-distribution .usage-accounts button {
+  font-size: 12px;
+}
+.storage-distribution .muted {
+  font-size: 12px;
+}
+#usage-allocation rect[role="button"] {
+  cursor: pointer;
+}
+#usage-path-panel {
+  border-top: 1px solid #e3ebee;
+  margin-top: 18px;
+  padding-top: 15px;
+}
+#usage-path-panel[hidden] {
+  display: none;
+}
+.usage-path-row {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.usage-path-row svg {
+  height: 12px;
+}
+.usage-path-row strong {
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .overview-metrics,
+  .account-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .monitor-head,
+  .monitor-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .monitor-tools {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .storage-overview {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .storage-gauge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+  }
+  .storage-gauge > svg {
+    width: 120px;
+    height: 120px;
+    margin: 0;
+  }
+  .detail-values {
+    grid-template-columns: 1fr;
+  }
+  .metric-card {
+    padding: 13px;
+  }
+  .account-tile {
+    padding: 12px;
+  }
+  .monitor-actions {
+    flex-wrap: wrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .insight-dialog::backdrop {
+    backdrop-filter: none;
+  }
+}
+
+#twin-memory{display:block;width:100%;height:8px;margin-top:12px;accent-color:#218878}.twin-gpu{position:relative}.gpu-activity-meter{position:absolute;bottom:3px;left:10px;width:calc(100% - 20px);height:3px;accent-color:var(--lab-color)}

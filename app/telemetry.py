@@ -304,6 +304,7 @@ def read(hours=2):
                 ts=d["ts"],
                 load=d["load"],
                 memory=d["memory_used"],
+                cpu_util=d.get("cpu_util"),
                 gpu=sum(g["util"] or 0 for g in d["gpus"]) / max(1, len(d["gpus"])),
                 accounts=[
                     dict(

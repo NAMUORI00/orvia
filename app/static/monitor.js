@@ -1,11 +1,13 @@
 (async () => {
-  const messages = await fetch("/api/translations").then((r) => r.json());
-  const t = (s) => messages[s] || s;
+  const messages = await fetch("/api/translations").then((r) => r.json()),
+    t = (s) => messages[s] || s,
+    V = window.OrviaViz;
   const el = (id) => document.getElementById(id),
-    text = (tag, value) => {
-      const e = document.createElement(tag);
-      e.textContent = value;
-      return e;
+    node = (tag, value, cls) => {
+      const n = document.createElement(tag);
+      n.textContent = value || "";
+      if (cls) n.className = cls;
+      return n;
     };
   const size = (n) =>
     n == null
@@ -15,278 +17,301 @@
         : n >= 1e6
           ? (n / 1e6).toFixed(1) + " MB"
           : (n / 1024).toFixed(1) + " KiB";
-  let selected = null,
-    data = null,
-    timer;
-  function chart(id, values, label, unit) {
-    const node = el(id);
-    node.replaceChildren();
-    const valid = values.filter((v) => v != null);
-    if (!valid.length) {
-      el(label).textContent = t("수집 대기");
-      return;
-    }
-    const peak = Math.max(...valid),
-      max = Math.max(1, peak);
-    let segment = [];
-    const flush = () => {
-      if (segment.length) {
-        const p = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "polyline",
-        );
-        p.setAttribute("points", segment.join(" "));
-        p.setAttribute("fill", "none");
-        p.setAttribute("stroke", "#218878");
-        p.setAttribute("stroke-width", "3");
-        node.append(p);
-        segment = [];
-      }
-    };
-    values.forEach((v, i) => {
-      if (v == null) {
-        flush();
-        return;
-      }
-      segment.push(
-        10 +
-          (i * 580) / Math.max(1, values.length - 1) +
-          "," +
-          (140 - (v / max) * 125),
-      );
-    });
-    flush();
-    const last = values
-      .map((v, i) => ({ v, i }))
-      .filter((p) => p.v != null)
-      .pop();
-    if (last) {
-      const point = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "circle",
-      );
-      point.setAttribute(
-        "cx",
-        10 + (last.i * 580) / Math.max(1, values.length - 1),
-      );
-      point.setAttribute("cy", 140 - (last.v / max) * 125);
-      point.setAttribute("r", "4");
-      point.setAttribute("fill", "#218878");
-      node.append(point);
-    }
-    el(label).textContent =
-      t("최대") +
-      " " +
-      peak.toFixed(2) +
-      " " +
-      unit +
-      " · " +
-      el("monitor-window").selectedOptions[0].textContent;
+  const colors = ["#218878", "#5b88bd", "#9872b4", "#cb984d"];
+  let data,
+    timer,
+    selected = null,
+    dialogKind = null;
+  const totals = (h, key) => {
+    const a = h.accounts.map((a) => a[key]).filter((v) => v != null);
+    return a.length ? a.reduce((a, b) => a + b, 0) : null;
+  };
+  function series(container, label, points, format, color, max) {
+    const graph = V.svg("svg", { class: "insight-chart" });
+    container.append(graph);
+    V.chart(graph, points, { label, format, color, max });
+    return graph;
+  }
+  function issues() {
+    const d = data.latest;
+    return [
+      ...d.accounts
+        .filter((a) => !a.running)
+        .map((a) => a.user + " · " + t("환경 정지")),
+      ...d.disks
+        .filter((d) => !d.mounted || (d.capacity && d.used / d.capacity >= 0.9))
+        .map(
+          (d) =>
+            d.title +
+            " · " +
+            t(d.mounted ? "저장공간 90% 이상" : "저장공간 연결 끊김"),
+        ),
+      ...d.gpus
+        .filter((g) => g.temperature >= 85)
+        .map((g) => "GPU " + g.index + " · " + t("온도 확인")),
+    ];
   }
   function render() {
-    if (!data || !data.latest) return;
-    const d = data.latest;
+    if (!data?.latest) return;
+    const d = data.latest,
+      h = data.history,
+      stale = Date.now() / 1000 - d.ts > 180;
     el("monitor-time").textContent = new Date(d.ts * 1000).toLocaleString();
-    el("monitor-error").textContent =
-      Date.now() / 1000 - d.ts > 180 ? t("수집 지연 · 마지막 기록 표시") : "";
-    const summary = el("monitor-summary");
-    summary.replaceChildren();
-    for (const [key, value] of [
-      [
-        t("실행 중"),
-        d.accounts.filter((a) => a.running).length + " / " + d.accounts.length,
-      ],
-      [
-        t("시스템 메모리"),
-        (d.memory_used / 1073741824).toFixed(1) +
-          " / " +
-          (d.memory_total / 1073741824).toFixed(0) +
-          " GiB",
-      ],
-      [
-        t("평균 GPU 사용률"),
-        (
-          d.gpus.reduce((v, g) => v + (g.util || 0), 0) /
-          Math.max(1, d.gpus.length)
-        ).toFixed(1) + "%",
-      ],
-      [
-        t("서버 CPU 사용률"),
-        d.cpu_util == null ? "N/A" : d.cpu_util.toFixed(1) + "%",
-      ],
-    ]) {
-      const box = text("div", "");
-      box.append(text("span", key), text("strong", value));
-      summary.append(box);
-    }
+    el("monitor-error").textContent = stale
+      ? t("수집 지연 · 마지막 기록 표시")
+      : "";
+    const warning = issues();
+    el("monitor-health").textContent = t(
+      stale ? "수집 지연" : warning.length ? "확인 필요" : "모든 환경 실행 중",
+    );
+    el("monitor-health").classList.toggle(
+      "attention",
+      stale || !!warning.length,
+    );
+    const panels = [
+      {
+        name: "서버 CPU 사용률",
+        key: "cpu",
+        color: colors[0],
+        max: 100,
+        format: (v) => v.toFixed(1) + "%",
+        values: h.map((p) => ({ ts: p.ts, value: p.cpu_util })),
+      },
+      {
+        name: "평균 GPU 사용률",
+        key: "gpu",
+        color: colors[1],
+        max: 100,
+        format: (v) => v.toFixed(1) + "%",
+        values: h.map((p) => ({ ts: p.ts, value: p.gpu })),
+      },
+      {
+        name: "시스템 메모리",
+        key: "memory",
+        color: colors[2],
+        max: d.memory_total / 1073741824,
+        format: (v) => v.toFixed(1) + " GiB",
+        values: h.map((p) => ({ ts: p.ts, value: p.memory / 1073741824 })),
+      },
+      {
+        name: "네트워크",
+        key: "network",
+        color: colors[3],
+        format: (v) => size(v) + "/s",
+        values: h.map((p) => ({
+          ts: p.ts,
+          value:
+            totals(p, "rx") == null ? null : totals(p, "rx") + totals(p, "tx"),
+        })),
+      },
+    ];
+    const overview = el("monitor-overview");
+    overview.replaceChildren();
+    panels.forEach((p) => {
+      const card = node("section", "", "metric-card");
+      const button = node("button", t(p.name), "metric-title");
+      button.type = "button";
+      button.onclick = () => open("hardware");
+      card.append(button);
+      series(card, t(p.name), p.values, p.format, p.color, p.max);
+      const foot = node("span", t("사용 추이"), "metric-caption");
+      card.append(foot);
+      overview.append(card);
+    });
     const users = el("monitor-users");
     users.replaceChildren();
     d.accounts.forEach((a) => {
-      const row = document.createElement("tr");
-      if (selected === a.user) row.className = "selected";
-      const cell = document.createElement("td"),
-        b = text("button", a.user);
-      b.className = "secondary";
-      b.onclick = () => {
-        selected = a.user;
-        render();
-      };
-      cell.append(b);
-      row.append(cell);
-      for (const value of [
-        t(a.running ? "실행 중" : "정지"),
+      const card = node("article", "", "account-tile");
+      const button = node("button", "", "account-select");
+      button.type = "button";
+      const status = node(
+        "span",
+        "",
+        "presence " + (a.running ? "online" : "offline"),
+      );
+      status.setAttribute("aria-label", t(a.running ? "실행 중" : "정지"));
+      button.append(
+        status,
+        node("strong", a.user),
+        node("span", "›", "account-arrow"),
+      );
+      button.onclick = () => open("account", a.user);
+      card.append(button);
+      const p = h.map((row) => ({
+        ts: row.ts,
+        value:
+          row.accounts.find((u) => u.user === a.user)?.cpu == null
+            ? null
+            : row.accounts.find((u) => u.user === a.user).cpu / 100,
+      }));
+      series(
+        card,
+        a.user + " · CPU",
+        p,
+        (v) => v.toFixed(2) + " " + t("코어"),
+        a.running ? colors[0] : "#9cabb3",
+      );
+      card.append(
+        node("span", t(a.running ? "실행 중" : "정지"), "metric-caption"),
+      );
+      users.append(card);
+    });
+    if (el("monitor-detail").open) renderDetail();
+  }
+  function open(kind, user = null) {
+    dialogKind = kind;
+    selected = user;
+    V.hide();
+    renderDetail();
+    if (!el("monitor-detail").open) el("monitor-detail").showModal();
+  }
+  function row(list, label, value) {
+    const box = node("div", "", "detail-value");
+    box.append(node("dt", t(label)), node("dd", value));
+    list.append(box);
+  }
+  function renderDetail() {
+    if (!data?.latest) return;
+    const body = el("detail-body");
+    body.replaceChildren();
+    const d = data.latest;
+    let title = "";
+    if (dialogKind === "account") {
+      const a = d.accounts.find((a) => a.user === selected);
+      if (!a) return;
+      title = a.user;
+      const list = node("dl", "", "detail-values");
+      row(list, "상태", t(a.running ? "실행 중" : "정지"));
+      row(
+        list,
+        "CPU 사용량",
         a.cpu == null ? "N/A" : (a.cpu / 100).toFixed(2) + " " + t("코어"),
-        a.memory || "N/A",
+      );
+      row(list, "메모리", a.memory || "N/A");
+      row(
+        list,
+        "수신 / 송신",
         a.rates ? size(a.rates.rx) + "/s / " + size(a.rates.tx) + "/s" : "N/A",
+      );
+      row(
+        list,
+        "패킷 / 초",
         a.rates ? (a.rates.rx_packets + a.rates.tx_packets).toFixed(1) : "N/A",
-        a.processes
-          .slice(0, 3)
-          .map((p) => p.name + (p.count > 1 ? " ×" + p.count : ""))
-          .join(" · ") +
-          (a.processes.length > 3 ? " +" + (a.processes.length - 3) : "") ||
-          "—",
-      ])
-        row.append(text("td", value));
-      users.append(row);
-    });
-    const detail = el("monitor-account");
-    detail.replaceChildren();
-    detail.hidden = !selected;
-    const account = d.accounts.find((a) => a.user === selected);
-    if (account) {
-      detail.append(
-        text("h3", account.user),
-        text(
+      );
+      row(list, "디스크 읽기 / 쓰기", a.block_io || "N/A");
+      row(
+        list,
+        "패킷 오류 / 드롭",
+        a.network ? a.network.errors + " / " + a.network.drops : "N/A",
+      );
+      body.append(
+        list,
+        node("h3", t("주요 프로세스")),
+        node(
           "p",
-          account.processes.map((p) => p.name + " ×" + p.count).join(" · "),
+          a.processes.map((p) => p.name + " ×" + p.count).join(" · ") || "—",
         ),
       );
-      const net = account.network || {};
-      detail.append(
-        text(
-          "p",
-          t("누적 수신 / 송신") + " · " + size(net.rx) + " / " + size(net.tx),
-        ),
-        text(
-          "p",
-          t("패킷 오류 / 드롭") +
-            " · " +
-            (net.errors ?? "N/A") +
-            " / " +
-            (net.drops ?? "N/A"),
-        ),
-        text(
-          "p",
-          t("디스크 읽기 / 쓰기") + " · " + (account.block_io || "N/A"),
+      const link = node("a", t("저장공간 분석"), "button");
+      link.href = "/labs/" + encodeURIComponent(a.lab) + "/files";
+      body.append(link);
+      body.append(node("h3", t("CPU 사용 추이")));
+      series(
+        body,
+        "CPU",
+        data.history.map((p) => ({
+          ts: p.ts,
+          value:
+            p.accounts.find((u) => u.user === selected)?.cpu == null
+              ? null
+              : p.accounts.find((u) => u.user === selected).cpu / 100,
+        })),
+        (v) => v.toFixed(2) + " " + t("코어"),
+        colors[0],
+      );
+    } else if (dialogKind === "hardware") {
+      title = t("하드웨어 상태");
+      const grid = node("div", "", "monitor-hardware");
+      d.gpus.forEach((g) => {
+        const box = node("div");
+        box.append(
+          node("strong", "GPU " + g.index),
+          node(
+            "span",
+            (g.util ?? "N/A") + "% · " + (g.temperature ?? "N/A") + " °C",
+          ),
+          node("span", (g.used ?? "N/A") + " / " + (g.total ?? "N/A") + " MiB"),
+          node("span", (g.power ?? "N/A") + " W"),
+        );
+        grid.append(box);
+      });
+      d.disks.forEach((s) => {
+        const box = node("div");
+        box.append(
+          node("strong", s.title),
+          node(
+            "span",
+            s.mounted
+              ? size(s.used) + " / " + size(s.capacity)
+              : t("저장공간 연결 끊김"),
+          ),
+        );
+        grid.append(box);
+      });
+      body.append(grid);
+    } else if (dialogKind === "events") {
+      title = t("상태 변경 기록");
+      const names = {
+        started: "환경 시작",
+        stopped: "환경 정지",
+        restarted: "환경 재시작",
+        mount_missing: "저장공간 연결 끊김",
+        storage_high: "저장공간 90% 이상",
+      };
+      data.events.forEach((e) =>
+        body.append(
+          node(
+            "p",
+            new Date(e.ts * 1000).toLocaleString() +
+              " · " +
+              e.subject +
+              " · " +
+              t(names[e.kind] || e.kind),
+          ),
         ),
       );
-      const link = text("a", t("저장공간 분석"));
-      link.href = "/labs/" + encodeURIComponent(account.lab) + "/files";
-      detail.append(link);
+      if (!data.events.length) body.append(node("p", t("상태 변경 기록 없음")));
+    } else if (dialogKind === "health") {
+      title = t("상태 확인");
+      const messages = issues();
+      body.append(
+        ...(messages.length ? messages : [t("모든 환경 실행 중")]).map((s) =>
+          node("p", s),
+        ),
+      );
+    } else {
+      title = t("집계 기준");
+      body.append(
+        node("p", t("1분 간격 · 7일 보관 · 실행 상태와 자원 지표만 수집")),
+        node(
+          "p",
+          t(
+            "CPU 사용량은 논리 CPU 개수로 환산합니다. 송수신량은 컨테이너 네트워크 인터페이스 기준이며 패킷 본문·접속 목적지·명령 인자·파일 내용은 수집하지 않습니다. 실행 상태는 외부 SSH 접속 성공 여부를 뜻하지 않습니다. 프로세스 이름만으로 연구 내용이나 작업 목적을 판단하지 않습니다.",
+          ),
+        ),
+      );
     }
-    const chosen = (h) =>
-      h.accounts.filter((a) => !selected || a.user === selected);
-    const totals = (h, f) => {
-      const a = chosen(h)
-        .map(f)
-        .filter((v) => v != null);
-      return a.length ? a.reduce((v, n) => v + n, 0) : null;
-    };
-    chart(
-      "cpu-history",
-      data.history.map((h) =>
-        totals(h, (a) => (a.cpu == null ? null : a.cpu / 100)),
-      ),
-      "cpu-chart-range",
-      t("코어"),
-    );
-    chart(
-      "net-history",
-      data.history.map((h) =>
-        totals(h, (a) => (a.rx == null ? null : (a.rx + a.tx) / 1024)),
-      ),
-      "net-chart-range",
-      "KiB/s",
-    );
-    el("cpu-chart-title").textContent =
-      (selected ? selected + " · " : "") + t("CPU 사용 추이");
-    chart(
-      "gpu-history",
-      data.history.map((h) => h.gpu),
-      "gpu-chart-range",
-      "%",
-    );
-    chart(
-      "memory-history",
-      data.history.map((h) => h.memory / 1073741824),
-      "memory-chart-range",
-      "GiB",
-    );
-    const hw = el("monitor-hardware");
-    hw.replaceChildren();
-    d.gpus.forEach((g) => {
-      const box = text("div", "");
-      box.append(
-        text("strong", "GPU " + g.index),
-        text(
-          "span",
-          (g.util ?? "N/A") + "% · " + (g.temperature ?? "N/A") + " °C",
-        ),
-        text("span", (g.used ?? "N/A") + " / " + (g.total ?? "N/A") + " MiB"),
-        text("span", (g.power ?? "N/A") + " W"),
-      );
-      hw.append(box);
-    });
-    d.disks.forEach((s) => {
-      const box = text("div", "");
-      box.append(
-        text("strong", s.title),
-        text(
-          "span",
-          s.mounted
-            ? size(s.used) + " / " + size(s.capacity)
-            : t("저장공간 연결 끊김"),
-        ),
-      );
-      hw.append(box);
-    });
-    const events = el("monitor-events");
-    events.replaceChildren();
-    const names = {
-      started: "환경 시작",
-      stopped: "환경 정지",
-      restarted: "환경 재시작",
-      mount_missing: "저장공간 연결 끊김",
-      storage_high: "저장공간 90% 이상",
-    };
-    data.events.forEach((e) =>
-      events.append(
-        text(
-          "p",
-          new Date(e.ts * 1000).toLocaleString() +
-            " · " +
-            e.subject +
-            " · " +
-            t(names[e.kind] || e.kind),
-        ),
-      ),
-    );
-    if (!data.events.length) events.append(text("p", t("상태 변경 기록 없음")));
+    el("detail-title").textContent = title;
   }
+  el("detail-close").onclick = () => el("monitor-detail").close();
+  el("monitor-detail").addEventListener("close", V.hide);
+  el("monitor-hardware-open").onclick = () => open("hardware");
+  el("monitor-events-open").onclick = () => open("events");
+  el("monitor-info-open").onclick = () => open("info");
+  el("monitor-health").onclick = () => data?.latest && open("health");
   function schedule() {
-    timer = setTimeout(() => {
-      if (document.hidden) schedule();
-      else load();
-    }, 60000);
+    timer = setTimeout(() => (document.hidden ? schedule() : load()), 60000);
   }
-  el("monitor-window").onchange = () => {
-    clearTimeout(timer);
-    load();
-  };
-  el("monitor-reset").onclick = () => {
-    selected = null;
-    render();
-  };
   async function load() {
     try {
       const r = await fetch(
@@ -301,6 +326,10 @@
       schedule();
     }
   }
+  el("monitor-window").onchange = () => {
+    clearTimeout(timer);
+    load();
+  };
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       clearTimeout(timer);
