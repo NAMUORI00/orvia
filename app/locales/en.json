@@ -621,5 +621,20 @@
   "생성 전 설정": "Not yet created",
   "Docker 이미지": "Docker image",
   "계정 입력": "Enter an account",
-  "이미지 선택": "Select an image"
+  "이미지 선택": "Select an image",
+  "자원 구성": "Resource configuration",
+  "변경 미리보기": "Change preview",
+  "현재 구성": "Current configuration",
+  "실행 이미지": "Running images",
+  "변경 전": "Before",
+  "변경 후 예상": "Proposed",
+  "할당 용량": "Allocated capacity",
+  "미리보기에는 입력값만 반영됩니다. 검토와 확인 후 적용됩니다.": "Only form values appear in this preview. Changes apply after review and confirmation.",
+  "입력값 초기화": "Reset inputs",
+  "계정 · 저장 경로": "Accounts · storage path",
+  "GPU 선택 필요": "Select a GPU",
+  "입력값 확인 필요": "Check input values",
+  "변경 없음": "No changes",
+  "환경 재생성 · 실행 작업 중단": "Environment recreation · running work stops",
+  "저장공간 확장 · 재시작 없음": "Storage expansion · no restart"
 }

@@ -97,3 +97,9 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Allocating a 3 GiB file on the 2 GB test filesystem failed as expected. After restarting only the test container, the persisted file and password SSH remained usable. Read-only system paths and absence of Docker socket were checked.
 - Existing eight researcher container IDs, start times, running states and HostConfig were compared before/after. Test resources were isolated from existing laboratory storage.
 - The configuration preview labels settings as not yet created, highlights changed cards briefly, respects reduced motion, and uses no external model or rendering dependency.
+
+## 0.6.8 existing laboratory configuration comparison
+
+- Existing laboratory overview, GPU and storage pages share a current configuration diagram based on existing read-only status/catalog data. GPU and storage edit forms show a separate proposed configuration with added/removed GPU chips and capacity differences. Allocated disk capacity is used consistently on both sides, rather than mixing it with filesystem usable capacity.
+- Preview code has no fetch, submit or server mutation. Existing confirmation and acknowledgement forms remain authoritative. Invalid values, empty GPU selection and reset are handled locally.
+- Browser checks on graphics exercised GPU 0 selection without applying it, reset, and a 1000-to-1500 GB storage preview (+500 GB). No production mutation was submitted.
