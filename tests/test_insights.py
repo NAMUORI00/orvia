@@ -43,6 +43,70 @@ class StorageTests(unittest.TestCase):
 
 
 class TelemetryTests(unittest.TestCase):
+    def test_network_totals_exclude_restarts_gaps_and_resets(self):
+        def point(ts, count, started="one", lab="lab"):
+            return dict(
+                ts=ts,
+                accounts=[
+                    dict(
+                        lab=lab,
+                        user="u",
+                        identity="id",
+                        started=started,
+                        network=dict(
+                            rx=count,
+                            tx=count * 2,
+                            rx_packets=count,
+                            tx_packets=count,
+                            errors=0,
+                            drops=0,
+                        ),
+                    )
+                ],
+            )
+
+        records = [
+            point(0, 0),
+            point(60, 100),
+            point(120, 10, "two"),
+            point(180, 20, "two"),
+            point(600, 100, "two"),
+            point(660, 5, "two"),
+            point(720, 15, "two"),
+        ]
+        r = telemetry.network_summary(records)[0]
+        self.assertEqual((r["rx"], r["tx"], r["seconds"]), (120, 240, 180))
+        self.assertEqual(r["peak"], 5)
+        self.assertEqual(r["peak_ts"], 60)
+
+    def test_network_history_keeps_error_deltas_and_lab_identity(self):
+        def point(ts, errors):
+            return dict(
+                ts=ts,
+                accounts=[
+                    dict(
+                        lab=lab,
+                        user="same",
+                        identity=lab,
+                        started="one",
+                        network=dict(
+                            rx=ts,
+                            tx=ts,
+                            rx_packets=0,
+                            tx_packets=0,
+                            errors=errors,
+                            drops=0,
+                        ),
+                    )
+                    for lab in ("a", "b")
+                ],
+            )
+
+        result = telemetry.network_summary([point(0, 10), point(60, 12)])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["errors"], 2)
+        self.assertEqual(result[0]["incidents"], [dict(ts=60, errors=2, drops=0)])
+
     def test_network_counters_ignore_loopback(self):
         raw = "header\nheader\nlo: 99 9 0 0 0 0 0 0 99 9 0 0 0 0 0 0\neth0: 100 2 1 3 0 0 0 0 200 4 5 6 0 0 0 0"
         with patch.object(pathlib.Path, "read_text", return_value=raw):

@@ -279,6 +279,63 @@ def collect_forever():
         time.sleep(max(5, INTERVAL - (time.monotonic() - start)))
 
 
+def network_summary(samples):
+    """Integrate raw counter deltas, never decimated graph points or reset counters."""
+    result = {}
+    previous = None
+    for current in samples:
+        prior = {(a["lab"], a["user"]): a for a in (previous or {}).get("accounts", [])}
+        dt = current["ts"] - previous["ts"] if previous else 0
+        for a in current["accounts"]:
+            key = (a["lab"], a["user"])
+            r = result.setdefault(
+                key,
+                dict(
+                    lab=a["lab"],
+                    user=a["user"],
+                    rx=0,
+                    tx=0,
+                    rx_packets=0,
+                    tx_packets=0,
+                    errors=0,
+                    drops=0,
+                    seconds=0,
+                    peak=0,
+                    peak_ts=None,
+                    incidents=[],
+                ),
+            )
+            old = prior.get(key)
+            if not (
+                old
+                and 0 < dt <= INTERVAL * 3
+                and a.get("network")
+                and old.get("network")
+                and a.get("identity") == old.get("identity")
+                and a.get("started") == old.get("started")
+            ):
+                continue
+            delta = {
+                k: a["network"][k] - old["network"][k]
+                for k in ("rx", "tx", "rx_packets", "tx_packets", "errors", "drops")
+            }
+            if any(v < 0 for v in delta.values()):
+                continue
+            r["seconds"] += dt
+            for k, v in delta.items():
+                r[k] += v
+            rate = (delta["rx"] + delta["tx"]) / dt
+            if r["peak_ts"] is None or rate > r["peak"]:
+                r["peak"], r["peak_ts"] = rate, current["ts"]
+            if delta["errors"] or delta["drops"]:
+                r["incidents"].append(
+                    dict(ts=current["ts"], errors=delta["errors"], drops=delta["drops"])
+                )
+                r["incidents"] = r["incidents"][-20:]
+        previous = current
+    return sorted(result.values(), key=lambda r: r["rx"] + r["tx"], reverse=True)
+
+
 def read(hours=2):
     hours = int(hours)
     if hours not in (2, 24, 168):
@@ -286,6 +343,12 @@ def read(hours=2):
     since = int(time.time()) - hours * 3600
     bucket = max(60, hours * 3600 // 120)
     with database() as c:
+        network_usage = network_summary(
+            json.loads(r[0])
+            for r in c.execute(
+                "SELECT payload FROM samples WHERE ts>=? ORDER BY ts", (since,)
+            )
+        )
         rows = c.execute(
             "SELECT ts,payload FROM samples WHERE ts IN (SELECT MAX(ts) FROM samples WHERE ts>=? GROUP BY CAST((ts-?)/? AS INTEGER)) ORDER BY ts DESC",
             (since, since, bucket),
@@ -309,6 +372,7 @@ def read(hours=2):
                 accounts=[
                     dict(
                         user=a["user"],
+                        lab=a["lab"],
                         cpu=a["cpu"],
                         rx=(a["rates"] or {}).get("rx"),
                         tx=(a["rates"] or {}).get("tx"),
@@ -320,6 +384,7 @@ def read(hours=2):
         ],
         events=events,
         interval=INTERVAL,
+        network_usage=network_usage,
         retention_days=7,
     )
 

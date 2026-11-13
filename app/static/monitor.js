@@ -111,7 +111,7 @@
       const card = node("section", "", "metric-card");
       const button = node("button", t(p.name), "metric-title");
       button.type = "button";
-      button.onclick = () => open("hardware");
+      button.onclick = () => open(p.key === "network" ? "network" : "hardware");
       card.append(button);
       series(card, t(p.name), p.values, p.format, p.color, p.max);
       const foot = node("span", t("사용 추이"), "metric-caption");
@@ -156,7 +156,124 @@
       );
       users.append(card);
     });
+    renderNetwork(el("network-ranking"));
     if (el("monitor-detail").open) renderDetail();
+  }
+  function renderNetwork(target) {
+    target.replaceChildren();
+    const usage = data.network_usage || [];
+    const max = Math.max(1, ...usage.map((a) => a.rx + a.tx));
+    usage.forEach((a) => {
+      const button = node("button", "", "network-account");
+      button.type = "button";
+      button.append(node("strong", a.user));
+      const bar = node("span", "", "network-bar");
+      ["rx", "tx"].forEach((k) => {
+        const segment = node("span", "", "network-" + k);
+        segment.style.width = (100 * a[k]) / max + "%";
+        bar.append(segment);
+      });
+      button.append(bar, node("span", a.seconds ? "›" : "N/A"));
+      V.hint(
+        button,
+        () =>
+          a.user +
+          "\n" +
+          t("수신") +
+          " " +
+          (a.seconds ? size(a.rx) : "N/A") +
+          " · " +
+          t("송신") +
+          " " +
+          (a.seconds ? size(a.tx) : "N/A"),
+      );
+      button.onclick = () => open("network-account", a.lab + "/" + a.user);
+      target.append(button);
+    });
+  }
+  function networkDetail(body, a) {
+    const list = node("dl", "", "detail-values");
+    row(list, "기간 수신량", a.seconds ? size(a.rx) : "N/A");
+    row(list, "기간 송신량", a.seconds ? size(a.tx) : "N/A");
+    row(
+      list,
+      "수신 / 송신 패킷",
+      a.seconds
+        ? a.rx_packets.toLocaleString() + " / " + a.tx_packets.toLocaleString()
+        : "N/A",
+    );
+    row(list, "최고 전송률", a.seconds ? size(a.peak) + "/s" : "N/A");
+    row(
+      list,
+      "최고 전송 시점",
+      a.peak_ts ? new Date(a.peak_ts * 1000).toLocaleString() : "N/A",
+    );
+    row(list, "집계 시간", (a.seconds / 3600).toFixed(2) + " h");
+    row(
+      list,
+      "패킷 오류 / 드롭",
+      a.seconds ? a.errors + " / " + a.drops : "N/A",
+    );
+    body.append(
+      list,
+      node(
+        "p",
+        t(
+          "확인된 연속 기록만 합산합니다. 재시작·수집 공백은 제외하며 최고 전송률은 수집 간격의 평균입니다.",
+        ),
+        "muted",
+      ),
+    );
+    const grid = node("div", "", "network-detail-charts");
+    const scale = Math.max(
+      1,
+      ...data.history.flatMap((p) => {
+        const u = p.accounts.find((u) => u.user === a.user && u.lab === a.lab);
+        return [u?.rx || 0, u?.tx || 0];
+      }),
+    );
+    ["rx", "tx"].forEach((key, i) => {
+      const card = node("section", "", "metric-card");
+      card.append(node("h3", t(key === "rx" ? "수신" : "송신")));
+      series(
+        card,
+        t(key === "rx" ? "수신" : "송신"),
+        data.history.map((p) => ({
+          ts: p.ts,
+          value:
+            p.accounts.find((u) => u.user === a.user && u.lab === a.lab)?.[
+              key
+            ] ?? null,
+        })),
+        (v) => size(v) + "/s",
+        colors[i],
+        scale,
+      );
+      grid.append(card);
+    });
+    body.append(grid, node("h3", t("패킷 오류·드롭 기록")));
+    if (!a.incidents.length)
+      body.append(
+        node("p", t(a.seconds ? "선택 기간 내 기록 없음" : "수집 대기")),
+      );
+    [...a.incidents]
+      .reverse()
+      .forEach((e) =>
+        body.append(
+          node(
+            "p",
+            new Date(e.ts * 1000).toLocaleString() +
+              " · " +
+              t("오류") +
+              " " +
+              e.errors +
+              " · " +
+              t("드롭") +
+              " " +
+              e.drops,
+          ),
+        ),
+      );
   }
   function open(kind, user = null) {
     dialogKind = kind;
@@ -176,7 +293,17 @@
     body.replaceChildren();
     const d = data.latest;
     let title = "";
-    if (dialogKind === "account") {
+    if (dialogKind === "network") {
+      title = t("네트워크 사용량");
+      renderNetwork(body);
+    } else if (dialogKind === "network-account") {
+      const a = (data.network_usage || []).find(
+        (a) => a.lab + "/" + a.user === selected,
+      );
+      if (!a) return;
+      title = a.user + " · " + t("네트워크");
+      networkDetail(body, a);
+    } else if (dialogKind === "account") {
       const a = d.accounts.find((a) => a.user === selected);
       if (!a) return;
       title = a.user;
@@ -215,6 +342,9 @@
       const link = node("a", t("저장공간 분석"), "button");
       link.href = "/labs/" + encodeURIComponent(a.lab) + "/files";
       body.append(link);
+      const net = node("button", t("네트워크 상세"), "secondary");
+      net.onclick = () => open("network-account", a.lab + "/" + a.user);
+      body.append(net);
       body.append(node("h3", t("CPU 사용 추이")));
       series(
         body,

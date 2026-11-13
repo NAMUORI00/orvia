@@ -57,3 +57,9 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Storage overview shows capacity and account shares before revealing a selected account's paths. Hardware, events and measurement notes remain available through explicit actions.
 - Browser verification covered keyboard chart readings, account details and storage path drill-down against live read-only metrics. Collection intervals and retention are unchanged.
 - The 65 Linux unit tests passed. Existing research containers are preserved during dashboard-only deployment.
+
+## 0.6.2 account network usage
+
+- Ranked received/sent volume uses raw counter deltas before chart downsampling. Container identity changes, counter resets and gaps over three minutes are excluded; measured duration remains explicit.
+- Account selection opens received/sent charts, period totals, sampled peak rate/time and up to 20 recent packet error/drop intervals. No packet payload or destination collection was added.
+- Tests cover restart/reset/gap boundaries, lab-scoped account identity and packet error deltas. Deployment only restarts dashboard services.
