@@ -88,3 +88,12 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Official NVIDIA CUDA and NGC PyTorch catalogs are the default. Locally available official layer prefixes identify the bases used by existing laboratories; all four current image families matched nvidia/cuda:12.4.1-base-ubuntu22.04. Customized laboratory image reuse is collapsed under advanced controls.
 - Official creation validates the provider reference, pins an available image ID, and adds SSH/Python tools. Conda and additional libraries are not implied by a CUDA base. Live image catalog and wizard selection were checked; 80 Linux unit tests passed. Full creation from a new official base was not executed.
 - Deployment restarts dashboard services only; existing researcher containers are protected.
+
+## 0.6.7 official-image end-to-end verification and visual configuration
+
+- A disposable laboratory was provisioned through authenticated HTTP creation and apply endpoints from nvidia/cuda:12.4.1-base-ubuntu22.04, using GPU 0 only and a 2 GB dedicated filesystem. UI checks covered provider/version selection and a live image/GPU/storage/account configuration diagram.
+- The first SSH test found research.sh copied as root-only under the service umask. The image recipe now explicitly sets mode 644. The disposable laboratory was removed and generated again; real password SSH then completed without profile errors.
+- The account saw exactly GPU 0's UUID. CUDA driver initialization, a 4 MiB device allocation, memset, synchronization and release passed. Python 3.10.12 was available. This does not validate PyTorch or every upstream image tag.
+- Allocating a 3 GiB file on the 2 GB test filesystem failed as expected. After restarting only the test container, the persisted file and password SSH remained usable. Read-only system paths and absence of Docker socket were checked.
+- Existing eight researcher container IDs, start times, running states and HostConfig were compared before/after. Test resources were isolated from existing laboratory storage.
+- The configuration preview labels settings as not yet created, highlights changed cards briefly, respects reduced motion, and uses no external model or rendering dependency.

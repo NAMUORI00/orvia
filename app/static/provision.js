@@ -20,6 +20,24 @@
       Array.from(crypto.getRandomValues(new Uint8Array(4)), (n) =>
         n.toString(16).padStart(2, "0"),
       ).join("");
+    function blueprint() {
+      const official = form.elements.image_mode.value === "official";
+      const providerValue = form.elements.image_provider.value;
+      const image = official
+        ? (providerValue === "cuda" ? "NVIDIA CUDA" : "NVIDIA PyTorch") + " · " + (form.elements.image_tag.value || tr("이미지 버전 선택"))
+        : form.querySelector("[name=source_container]:checked")?.closest("label").querySelector("strong").textContent || tr("이미지 선택");
+      const values = {image, gpu: form.elements.gpu_index.value ? "GPU " + form.elements.gpu_index.value : "—", storage: Number(form.elements.storage_gb.value).toLocaleString() + " GB", user: form.elements.new_user.value || tr("계정 입력")};
+      for (const [key,value] of Object.entries(values)) {
+        const el = document.getElementById("blueprint-" + key);
+        if (el.textContent !== value) {
+          el.textContent = value;
+          if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+            el.closest(".blueprint-node").animate([{backgroundColor:"#c7ede4"},{backgroundColor:"#f3faf8"}],{duration:450});
+        }
+      }
+    }
+    form.addEventListener("input", blueprint);
+    form.addEventListener("change", blueprint);
     function valid() {
       if (
         step === 0 &&
@@ -41,6 +59,7 @@
       return true;
     }
     function show(move = false) {
+      blueprint();
       if (move) form.closest(".provision-wizard").scrollIntoView({block: "start"});
       panes.forEach((p, i) => (p.hidden = i !== step));
       document.querySelectorAll("[data-step-label]").forEach((p, i) => {
@@ -99,6 +118,7 @@
         (button.onclick = () => {
           form.elements.storage_gb.value = button.dataset.size;
           document.getElementById("storage-range").value = button.dataset.size;
+          blueprint();
         }),
     );
     const slider = document.getElementById("storage-range"),
@@ -160,6 +180,7 @@
         if (dragged?.dataset.dragKind !== zone.dataset.dropKind) return;
         dragged.querySelector("input").checked = true;
         selection(zone.dataset.dropKind);
+        blueprint();
       });
     });
     selection("image");
@@ -172,6 +193,7 @@
       form.querySelector("[data-base-tag]")?.dataset.baseTag || "";
     function selectedImage() {
       const repo = provider.value === "cuda" ? "nvidia/cuda" : "nvcr.io/nvidia/pytorch";
+      blueprint();
       document.getElementById("selected-official-image").textContent =
         repo + (tag.value ? ":" + tag.value : " · " + tr("이미지 버전 선택"));
       form.querySelectorAll("[data-base-tag]").forEach((button) => {
@@ -273,10 +295,16 @@
           const root = document.getElementById("provision-jobs");
           root.replaceChildren(
             ...data.jobs.map((job) => {
-              const line = document.createElement("p");
-              line.textContent = tr(
-                `${job.lab} · ${job.state} · ${job.message}`,
-              );
+              const line = document.createElement("div");
+              line.className = "provision-job";
+              const symbol = document.createElement("span");
+              symbol.className = "job-symbol";
+              symbol.textContent = job.state === "complete" ? "✓" : job.state === "failed" ? "!" : "◷";
+              symbol.setAttribute("aria-hidden", "true");
+              const body = document.createElement("div"), title = document.createElement("strong"), detail = document.createElement("small");
+              title.textContent = job.lab + " · " + tr(job.state);
+              detail.textContent = tr(job.message);
+              body.append(title, detail); line.append(symbol, body);
               return line;
             }),
           );

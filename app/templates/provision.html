@@ -6,6 +6,14 @@
 <nav class="wizard-steps" aria-label="생성 단계"><span data-step-label="0">1 · 연구실·이미지</span><span data-step-label="1">2 · 자원 배정</span><span data-step-label="2">3 · 첫 사용자</span></nav>
 <form id="create-lab-form" method="post" action="/provision/prepare">
 <input type="hidden" name="csrf" value="{{session.csrf}}">
+<div class="lab-blueprint" aria-label="구성 미리보기">
+<div class="blueprint-heading"><strong>구성 미리보기</strong><small>생성 전 설정</small></div>
+<div class="blueprint-nodes">
+<div class="blueprint-node"><span aria-hidden="true">▣</span><small>Docker 이미지</small><strong id="blueprint-image">—</strong></div>
+<div class="blueprint-node"><span aria-hidden="true">▥</span><small>GPU</small><strong id="blueprint-gpu">—</strong></div>
+<div class="blueprint-node"><span aria-hidden="true">▤</span><small>공유 저장공간</small><strong id="blueprint-storage">—</strong></div>
+<div class="blueprint-node"><span aria-hidden="true">♙</span><small>계정</small><strong id="blueprint-user">—</strong></div>
+</div></div>
 <section data-wizard-step="0">
 <label for="new-lab-title">연구실 이름</label><input id="new-lab-title" name="title" required maxlength="100" placeholder="교수님 연구실">
 <h2>사용할 Docker 이미지</h2>

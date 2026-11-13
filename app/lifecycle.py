@@ -389,7 +389,7 @@ def worker(p, job):
             + setup
             + f"RUN groupadd -g {p['uid']} {p['user']} && useradd -u {p['uid']} -g {p['uid']} -M -s /bin/bash {p['user']}\n"
             "COPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
-            'COPY research.sh /etc/profile.d/research.sh\nENTRYPOINT ["/usr/local/sbin/research-entrypoint"]\nCMD []\n'
+            'COPY research.sh /etc/profile.d/research.sh\nRUN chmod 644 /etc/profile.d/research.sh\nENTRYPOINT ["/usr/local/sbin/research-entrypoint"]\nCMD []\n'
         )
         image = run(
             "docker",
