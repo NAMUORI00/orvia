@@ -103,3 +103,9 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Existing laboratory overview, GPU and storage pages share a current configuration diagram based on existing read-only status/catalog data. GPU and storage edit forms show a separate proposed configuration with added/removed GPU chips and capacity differences. Allocated disk capacity is used consistently on both sides, rather than mixing it with filesystem usable capacity.
 - Preview code has no fetch, submit or server mutation. Existing confirmation and acknowledgement forms remain authoritative. Invalid values, empty GPU selection and reset are handled locally.
 - Browser checks on graphics exercised GPU 0 selection without applying it, reset, and a 1000-to-1500 GB storage preview (+500 GB). No production mutation was submitted.
+
+## 0.6.9 per-user CPU and memory limit comparison
+
+- CPU/memory management displays each laboratory account with before/proposed limits. Bars show the fraction of host capacity represented by each limit, not reserved capacity or measured use. Unlimited settings use a striped bar and explicit label.
+- Only the selected account reflects unsaved form values. Changing the selected account restores its configured limits. Input reset, invalid input and restart/recreation impact are handled locally; no requests are sent by the preview script.
+- Browser checks exercised a 16-core/128-GiB preview and switching accounts without submitting the form. Existing execution and allocation were not modified.

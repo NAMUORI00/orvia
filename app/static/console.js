@@ -306,10 +306,9 @@ if (resourceUser) {
     document.querySelector("#resource-preview").textContent =
       resourceUser.value +
       " → CPU " +
-      cpu.value +
+      (Number(cpu.value) === 0 ? tr("제한 없음") : cpu.value + " " + tr("코어")) +
       " / RAM " +
-      ram.value +
-      " GiB";
+      (Number(ram.value) === 0 ? tr("제한 없음") : ram.value + " GiB");
   };
   resourceUser.addEventListener("change", () => {
     cpu.value = resourceUser.selectedOptions[0].dataset.cpu;

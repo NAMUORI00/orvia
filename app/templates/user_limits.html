@@ -1,0 +1,9 @@
+<section class="card card-pad user-limit-comparison" data-cpu-total="{{data.cpu_count}}" data-ram-total="{{data.memory_total_gib}}">
+<div class="blueprint-heading"><h2>사용자별 자원 할당</h2><span class="badge">변경 미리보기</span></div>
+<p>막대는 서버 전체 대비 한도입니다. 실제 사용량이나 전용 예약량이 아닙니다.</p>
+<div class="user-limit-grid">{% for u in current.users %}<article class="user-limit-card" data-limit-user="{{u.name}}" data-cpu="{{u.cpu or 0}}" data-ram="{{u.ram or 0}}"><button type="button" class="secondary" data-select-limit-user="{{u.name}}">{{u.name}}</button><span class="limit-edit-state"></span>
+<div class="limit-pair-head"><span>변경 전</span><span>변경 후 예상</span></div>
+{% for kind,label in [('cpu','CPU'),('ram','시스템 메모리')] %}<div class="limit-metric"><strong>{{label}}</strong><div class="limit-pair">{% for side in ['before','after'] %}<div><span data-limit-value="{{kind}}-{{side}}"></span><div class="limit-bar" data-limit-bar="{{kind}}-{{side}}"><i></i></div></div>{% endfor %}</div></div>{% endfor %}
+</article>{% endfor %}</div>
+<div class="config-difference" role="status" aria-live="polite"><strong data-limit-impact></strong></div><p>선택한 사용자에게만 입력값을 미리 반영합니다. 다른 사용자의 한도는 유지됩니다.</p><button type="button" class="secondary" data-reset-user-limits>현재 할당으로 되돌리기</button>
+</section>

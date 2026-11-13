@@ -636,5 +636,14 @@
   "입력값 확인 필요": "Check input values",
   "변경 없음": "No changes",
   "환경 재생성 · 실행 작업 중단": "Environment recreation · running work stops",
-  "저장공간 확장 · 재시작 없음": "Storage expansion · no restart"
+  "저장공간 확장 · 재시작 없음": "Storage expansion · no restart",
+  "사용자별 자원 할당": "Per-user resource limits",
+  "막대는 서버 전체 대비 한도입니다. 실제 사용량이나 전용 예약량이 아닙니다.": "Bars show limits relative to host capacity, not utilization or reserved resources.",
+  "선택한 사용자에게만 입력값을 미리 반영합니다. 다른 사용자의 한도는 유지됩니다.": "Only the selected user is previewed. Other user limits remain unchanged.",
+  "현재 할당으로 되돌리기": "Reset to current limits",
+  "편집 대상": "Selected user",
+  "유지": "Unchanged",
+  "한도 해제 · 환경 재생성": "Remove limits · recreate environment",
+  "메모리 축소 · 재시작 필요": "Reduce memory · restart required",
+  "한도 변경 · 재시작 없음": "Change limits · no restart"
 }
