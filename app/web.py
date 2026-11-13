@@ -414,15 +414,10 @@ def set_language():
     lang = request.args.get("lang")
     if lang in TRANSLATIONS:
         session["language"] = lang
-    from urllib.parse import urlsplit
+    from i18n import return_path
 
-    previous = urlsplit(request.referrer or "/")
     return redirect(
-        previous.path
-        if previous.netloc == request.host
-        and previous.path.startswith("/")
-        and not previous.path.startswith("//")
-        else "/"
+        return_path(request.args.get("next") or request.referrer or "/", request.host)
     )
 
 

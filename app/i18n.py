@@ -23,6 +23,9 @@ def translate(text, lang):
     d = TRANSLATIONS.get(lang, {})
     if text.strip() in d:
         return text.replace(text.strip(), d[text.strip()])
+    normalized = " ".join(text.split())
+    if normalized in d:
+        return text.replace(text.strip(), d[normalized])
     # Longest-first matching avoids translating text produced by a previous match twice.
     import re
 
@@ -75,3 +78,21 @@ class LocalizedHTML(HTMLParser):
 
     def handle_comment(self, data):
         self.parts.append("<!--" + data + "-->")
+
+
+def return_path(value, host):
+    from urllib.parse import urlsplit, unquote
+
+    if any(ord(c) < 32 for c in value):
+        return "/"
+    target = urlsplit(value)
+    decoded = unquote(target.path)
+    if (
+        target.netloc not in ("", host)
+        or target.scheme not in ("", "http", "https")
+        or not decoded.startswith("/")
+        or decoded.startswith("//")
+        or chr(92) in decoded
+    ):
+        return "/"
+    return target.path + ("?" + target.query if target.query else "")
