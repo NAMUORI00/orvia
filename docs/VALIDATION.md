@@ -109,3 +109,9 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - CPU/memory management displays each laboratory account with before/proposed limits. Bars show the fraction of host capacity represented by each limit, not reserved capacity or measured use. Unlimited settings use a striped bar and explicit label.
 - Only the selected account reflects unsaved form values. Changing the selected account restores its configured limits. Input reset, invalid input and restart/recreation impact are handled locally; no requests are sent by the preview script.
 - Browser checks exercised a 16-core/128-GiB preview and switching accounts without submitting the form. Existing execution and allocation were not modified.
+
+## 0.6.10 actual laboratory and account usage
+
+- Laboratory overview and CPU/memory pages prioritize actual usage. Allocation controls are folded separately. Account CPU is Docker CPU percentage divided by logical CPU count; memory uses Docker reported bytes divided by host memory. Absolute core-equivalent and GiB values accompany percentages. Laboratory totals sum the configured account containers, not host-wide utilization.
+- A single latest SQLite row supplies each view; the endpoint strips process and unrelated account fields. No additional Docker stats/process sampling occurs on page requests. Refresh is once per minute and stops when hidden. Missing/stale samples show N/A instead of invented zeros.
+- Read-only browser validation used running graphics accounts; no allocation, restart or researcher container mutation was submitted.

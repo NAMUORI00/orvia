@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.6.9")
+    return jsonify(status="ok", version="0.6.10")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -214,7 +214,7 @@ def lab_page(lab_id, section="overview"):
         overview="연구실 설정",
         accounts="계정",
         resources="자원 배정",
-        limits="CPU·메모리 할당",
+        limits="CPU·메모리 점유율",
         gpu="GPU",
         storage="공유 저장공간",
         images="환경 템플릿",
@@ -516,3 +516,11 @@ def telemetry_retention():
         )
     except (ValueError, TypeError) as e:
         return jsonify(error=str(e)), 400
+
+
+@app.get("/api/lab-usage/<lab_id>")
+def lab_usage_api(lab_id):
+    try:
+        return jsonify(call({"action": "telemetry", "usage_lab": lab_id}))
+    except ValueError:
+        abort(404)

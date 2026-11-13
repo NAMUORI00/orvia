@@ -138,3 +138,21 @@ class TelemetryTests(unittest.TestCase):
             data = telemetry.read()
             self.assertIsNone(data["latest"])
             self.assertEqual(data["history"], [])
+
+
+class LatestUsageTests(unittest.TestCase):
+    def test_latest_sample_filters_lab_users_and_private_fields(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(hotops, "STATE", pathlib.Path(folder)), patch.object(hotops, "cfg", return_value={"labs":{"a":{"users":[{"name":"alice"}]}}}):
+            with telemetry.database() as c:
+                c.execute("INSERT INTO samples VALUES(?,?)", (1,json.dumps({"ts":1,"accounts":[]})))
+                c.execute("INSERT INTO samples VALUES(?,?)", (2,json.dumps({"ts":2,"cpu_count":32,"memory_total":1000,"accounts":[{"lab":"a","user":"alice","cpu":125,"memory":"2GiB / 8GiB","running":True,"processes":["private"]},{"lab":"b","user":"bob"},{"lab":"a","user":"removed"}]})))
+            result=telemetry.latest_lab("a")
+            self.assertEqual(result["ts"],2)
+            self.assertEqual([a["user"] for a in result["accounts"]],["alice"])
+            self.assertEqual(result["accounts"][0]["cpu"],125)
+            self.assertNotIn("processes",result["accounts"][0])
+            with self.assertRaises(ValueError):telemetry.latest_lab("unknown")
+
+    def test_missing_sample_remains_unknown(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(hotops, "STATE", pathlib.Path(folder)), patch.object(hotops, "cfg", return_value={"labs":{"a":{"users":[]}}}):
+            self.assertIsNone(telemetry.latest_lab("a")["ts"])

@@ -645,5 +645,13 @@
   "유지": "Unchanged",
   "한도 해제 · 환경 재생성": "Remove limits · recreate environment",
   "메모리 축소 · 재시작 필요": "Reduce memory · restart required",
-  "한도 변경 · 재시작 없음": "Change limits · no restart"
+  "한도 변경 · 재시작 없음": "Change limits · no restart",
+  "CPU·메모리 점유율": "CPU and memory usage",
+  "할당 설정": "Allocation settings",
+  "서버 전체 대비 실제 사용 비율 · 1분 간격 수집": "Actual share of server capacity · sampled every minute",
+  "연구실 CPU": "Laboratory CPU",
+  "연구실 시스템 메모리": "Laboratory system memory",
+  "사용자별 수치는 해당 계정 컨테이너 기준입니다. 메모리는 Docker 통계 기준이며 파일 캐시 일부는 제외됩니다.": "Per-user metrics cover the account container. Memory follows Docker statistics, excluding some file cache.",
+  "운영 현황 · 과거 기록 ›": "Monitoring · history ›",
+  "최근 수집": "Latest sample"
 }

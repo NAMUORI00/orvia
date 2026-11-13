@@ -1,0 +1,7 @@
+<section class="card card-pad lab-usage" data-usage-lab="{{lab.id}}">
+<div class="blueprint-heading"><h2>CPU·메모리 점유율</h2><small data-usage-time>수집 대기</small></div>
+<p>서버 전체 대비 실제 사용 비율 · 1분 간격 수집</p>
+<div class="usage-totals"><div><span>연구실 CPU</span><strong data-usage-total="cpu">N/A</strong><div class="usage-track"><i data-usage-fill="cpu"></i></div><small data-total-detail="cpu"></small></div><div><span>연구실 시스템 메모리</span><strong data-usage-total="memory">N/A</strong><div class="usage-track"><i data-usage-fill="memory"></i></div><small data-total-detail="memory"></small></div></div>
+<div class="usage-user-grid">{% for u in lab.users %}<article class="usage-user" data-usage-user="{{u.name}}"><div class="blueprint-heading"><strong>{{u.name}}</strong><small data-usage-state>N/A</small></div>{% for key,label in [('cpu','CPU'),('memory','시스템 메모리')] %}<div class="usage-metric"><span>{{label}}</span><strong data-usage-value="{{key}}">N/A</strong><div class="usage-track"><i data-usage-fill="{{key}}"></i></div><small data-usage-detail="{{key}}"></small></div>{% endfor %}</article>{% endfor %}</div>
+<p class="muted">사용자별 수치는 해당 계정 컨테이너 기준입니다. 메모리는 Docker 통계 기준이며 파일 캐시 일부는 제외됩니다.</p><a href="/monitor">운영 현황 · 과거 기록 ›</a>
+</section>

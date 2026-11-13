@@ -313,7 +313,7 @@ class Handler(socketserver.StreamRequestHandler):
                 if req.get("action") == "status":
                     result = snapshot()
                 elif req.get("action") == "telemetry":
-                    result = __import__("telemetry").read(
+                    result = __import__("telemetry").latest_lab(req["usage_lab"]) if req.get("usage_lab") else __import__("telemetry").read(
                         req.get("hours", 2), req.get("start"), req.get("end")
                     )
                 elif req.get("action") == "provision_sources":

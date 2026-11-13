@@ -370,3 +370,17 @@ def retention(values=None):
 
 def start():
     threading.Thread(target=collect_forever, daemon=True, name="orvia-metrics").start()
+
+
+def latest_lab(lab):
+    config = hotops.cfg()
+    if lab not in config["labs"]:
+        raise ValueError("Unknown laboratory")
+    names = {u["name"] for u in config["labs"][lab]["users"]}
+    with database() as c:
+        row = c.execute("SELECT payload FROM samples ORDER BY ts DESC LIMIT 1").fetchone()
+    if not row:
+        return dict(ts=None, cpu_count=None, memory_total=None, accounts=[])
+    data = json.loads(row[0])
+    return dict(ts=data["ts"], cpu_count=data.get("cpu_count"), memory_total=data.get("memory_total"),
+        accounts=[{k:a.get(k) for k in ("user","running","cpu","memory")} for a in data.get("accounts",[]) if a["lab"]==lab and a["user"] in names])
