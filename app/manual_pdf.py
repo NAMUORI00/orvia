@@ -1,12 +1,18 @@
-import io, pathlib, re
+import io, pathlib
 from xml.sax.saxutils import escape
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from i18n import translate
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    KeepTogether,
+)
 
 pdfmetrics.registerFont(
     TTFont(
@@ -15,21 +21,9 @@ pdfmetrics.registerFont(
 )
 
 
-def make_pdf(data, labs, f):
-    lang = f.get("document_language", "ko")
-    if lang not in ("ko", "en"):
-        raise ValueError("문서 언어를 선택하세요.")
-
-    def text(k, default="", limit=1200):
-        value = f.get(k, default).strip()
-        if len(value) > limit:
-            raise ValueError("입력 길이를 확인하세요.")
-        return value
-
-    host = text("host", "", 120)
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", host):
-        raise ValueError("서버 주소를 확인하세요.")
-    tr = lambda s: translate(s, lang)
+def make_pdf(document):
+    lang = document["language"]
+    tr = lambda ko, en: ko if lang == "ko" else en
     body = ParagraphStyle(
         "body",
         fontName="Nanum",
@@ -40,18 +34,17 @@ def make_pdf(data, labs, f):
     )
     head = ParagraphStyle("head", parent=body, fontSize=22, leading=30, spaceAfter=12)
     p = lambda s: Paragraph(escape(str(s)).replace("\n", "<br/>"), body)
-    lab = labs[0]
     story = [
-        Paragraph(tr("연구실 환경 안내서"), head),
-        p(text("document_title", lab["title"], 100)),
+        Paragraph(tr("연구실 접속 안내서", "Laboratory access guide"), head),
+        p(document["title"]),
         Spacer(1, 18),
     ]
 
-    def table(rows, widths):
+    def table(rows, widths, header=True):
         t = Table(
             [[p(v) for v in row] for row in rows],
             colWidths=widths,
-            repeatRows=1,
+            repeatRows=1 if header else 0,
             hAlign="LEFT",
         )
         t.setStyle(
@@ -69,84 +62,42 @@ def make_pdf(data, labs, f):
         )
         story.extend([t, Spacer(1, 15)])
 
-    table([[tr("서버 주소"), host]], [120, 375])
-    include = f.get("include_passwords") == "yes"
+    table([[tr("접속 주소", "Server address"), document["host"]]], [120, 375])
     rows = [
-        [tr("계정 ID"), "SSH " + ("포트" if lang == "ko" else "port")]
-        + ([tr("비밀번호")] if include else [])
-    ]
-    for u in lab["users"]:
-        rows.append(
-            [u["name"], u["port"]]
-            + ([text("pw_" + u["name"], "", 128) or tr("별도 안내")] if include else [])
-        )
-    table(rows, [190, 85, 220] if include else [350, 145])
-    gpu = next((g for g in data["gpus"] if g["index"] == lab["gpu"]), None)
-    gpu_spec = (
-        (
-            gpu.get("name", "NVIDIA GPU")
-            + " / "
-            + str(round(gpu["total"] / 1024, 1))
-            + " GiB"
-        )
-        if gpu
-        else "NVIDIA GPU"
-    )
-    users = data.get("account_resources", [])
-    cpu = " / ".join(
-        u["name"] + ": " + (str(u["cpu"]) + " cores" if u["cpu"] else text("cpu", ""))
-        for u in users
-    )
-    if users and all(u["cpu"] == users[0]["cpu"] for u in users):
-        cpu = (
-            str(users[0]["cpu"]) + " cores / account"
-            if users[0]["cpu"]
-            else text("cpu", "")
-        )
-    ram = " / ".join(
-        u["name"]
-        + ": "
-        + (
-            str(u["ram"]) + " GiB"
-            if u["ram"]
-            else str(data["memory_total_gib"]) + " GiB " + tr("공유")
-        )
-        for u in users
-    )
-    if users and all(u["ram"] == users[0]["ram"] for u in users):
-        ram = (
-            str(users[0]["ram"]) + " GiB / account"
-            if users[0]["ram"]
-            else str(data["memory_total_gib"]) + " GiB " + tr("공유")
-        )
-    table(
         [
-            [tr("사용 가능한 자원"), tr("사양")],
-            ["GPU", gpu_spec],
-            ["CPU", cpu or text("cpu", "")],
-            [tr("시스템 메모리"), ram or str(data["memory_total_gib"]) + " GiB"],
-            [
-                tr("저장공간"),
-                str(lab["storage_gb"])
-                + " GB · "
-                + tr("연구실 계정 합계 (파일시스템 기준)"),
-            ],
-            [tr("기본 개발 환경"), text("environment")],
-            [tr("권한 범위"), text("permissions")],
-        ],
+            tr("계정 ID", "Account ID"),
+            tr("사용자명", "Name"),
+            tr("SSH 포트", "SSH port"),
+        ]
+    ]
+    rows += [
+        [u["id"], u.get("display_name", "N/A"), u["port"]] for u in document["accounts"]
+    ]
+    if len(rows) == 1:
+        rows.append(["N/A", "N/A", "N/A"])
+    table(rows, [200, 200, 95])
+    table(
+        [[tr("사용 가능한 자원", "Available resources"), tr("사양", "Specification")]]
+        + [[r["label"], r["value"]] for r in document["resources"]],
         [120, 375],
     )
-    story.extend(
-        [
-            p(tr("시스템 메모리는 모든 서버 이용자가 공유합니다.")),
-            Spacer(1, 12),
-            p(tr("접속 명령")),
-        ]
-    )
-    for u in lab["users"]:
-        story.append(p("ssh -p " + str(u["port"]) + " " + u["name"] + "@" + host))
-    if text("note", "", 600):
-        story.extend([Spacer(1, 12), p(text("note", "", 600))])
+    if document["shared_memory"]:
+        story.extend(
+            [
+                p(
+                    tr(
+                        "시스템 메모리는 모든 서버 이용자가 공유합니다.",
+                        "System memory is shared by all server users.",
+                    )
+                ),
+                Spacer(1, 10),
+            ]
+        )
+    story.extend([p(tr("접속 명령", "Connection commands")), Spacer(1, 6)])
+    for u in document["accounts"]:
+        story.append(p(u["command"]))
+    if document["note"]:
+        story.extend([Spacer(1, 12), p(document["note"])])
     stream = io.BytesIO()
     doc = SimpleDocTemplate(
         stream,
@@ -155,7 +106,7 @@ def make_pdf(data, labs, f):
         rightMargin=50,
         topMargin=44,
         bottomMargin=42,
-        title=tr("연구실 환경 안내서"),
+        title=tr("연구실 접속 안내서", "Laboratory access guide"),
         author="LabHarbor",
     )
 

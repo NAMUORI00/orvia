@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.5.4")
+    return jsonify(status="ok", version="0.5.5")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -150,43 +150,33 @@ def api_action():
         return jsonify(error=str(e)), 403
 
 
-@app.get("/manual")
-def manual():
+def access_document(lab_id, lang, note=""):
+    from documents import compose
+
     data = call({"action": "status"})
     lab = next(
-        (l for l in data["labs"] if l["id"] == request.args.get("lab")),
-        data["labs"][0] if data["labs"] else None,
+        (l for l in data["labs"] if l["id"] == lab_id),
+        data["labs"][0] if not lab_id and data["labs"] else None,
     )
     if lab is None:
         abort(404)
+    catalog = call({"action": "catalog"})
+    accounts = next((l["users"] for l in catalog["labs"] if l["id"] == lab["id"]), [])
+    document_settings = json.loads(
+        pathlib.Path(
+            os.environ.get("H200_WEB_CONFIG", "/etc/h200-console/web.json")
+        ).read_text()
+    )
+    return data, lab, compose(document_settings, data, lab, accounts, lang, note)
+
+
+@app.get("/manual")
+def manual():
     from i18n import language
 
-    cpu = next(
-        (
-            l.split(":", 1)[1].strip()
-            for l in pathlib.Path("/proc/cpuinfo").read_text().splitlines()
-            if l.startswith("model name")
-        ),
-        "CPU",
-    )
-    blocks = [
-        dict(line.split(":", 1) for line in block.splitlines() if ":" in line)
-        for block in pathlib.Path("/proc/cpuinfo").read_text().split("\n\n")
-        if block.strip()
-    ]
-    sockets = {b.get("physical id\t", "0").strip() for b in blocks}
-    cpu = cpu + " × " + str(len(sockets)) + " / " + str(os.cpu_count()) + " threads"
-    defaults = settings.get("document_defaults", {})
-    lang = language()
+    data, lab, document = access_document(request.args.get("lab"), language())
     return render_template(
-        "manual.html",
-        data=data,
-        lab=lab,
-        locale=lang,
-        default_host="127.0.0.1" if lab["sandbox"] else request.host.split(":")[0],
-        cpu_model=cpu,
-        environment=defaults.get("environment_" + lang, ""),
-        permissions=defaults.get("permissions_" + lang, ""),
+        "manual.html", data=data, lab=lab, document=document, locale=language()
     )
 
 
@@ -194,27 +184,20 @@ def manual():
 def manual_pdf():
     from manual_pdf import make_pdf
 
-    data = call({"action": "status"})
-    labs = [l for l in data["labs"] if l["id"] == request.form.get("lab")]
-    if not labs:
-        abort(400)
-    catalog = call({"action": "catalog"})
-    data["account_resources"] = next(
-        l["users"] for l in catalog["labs"] if l["id"] == labs[0]["id"]
-    )
     try:
-        pdf = make_pdf(data, labs, request.form)
+        data, lab, document = access_document(
+            request.form.get("lab"),
+            request.form.get("document_language", "ko"),
+            request.form.get("note", ""),
+        )
+        pdf = make_pdf(document)
     except ValueError as e:
         return str(e), 400
     return send_file(
         pdf,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name="LabHarbor_"
-        + labs[0]["id"]
-        + "_"
-        + request.form.get("document_language", "ko")
-        + ".pdf",
+        download_name="LabHarbor_" + lab["id"] + "_" + document["language"] + ".pdf",
         max_age=0,
     )
 
@@ -237,6 +220,7 @@ def lab_page(lab_id, section="overview"):
         images="환경 템플릿",
         backups="백업",
         maintenance="환경 관리",
+        files="파일 탐색",
     )
     if section not in titles:
         abort(404)
@@ -246,8 +230,18 @@ def lab_page(lab_id, section="overview"):
         abort(404)
     catalog = call({"action": "catalog"})
     current = next(l for l in catalog["labs"] if l["id"] == lab_id)
+    files, file_error = None, None
+    if section == "files":
+        try:
+            files = call(
+                dict(action="files", lab=lab_id, path=request.args.get("path", ""))
+            )
+        except (OSError, ValueError) as e:
+            file_error = str(e)
     return render_template(
         "lab.html",
+        files=files,
+        file_error=file_error,
         data=data,
         lab=lab,
         current=current,
@@ -279,9 +273,48 @@ def provision_page():
         except (ValueError, OSError) as exc:
             flash(str(exc), "error")
         return redirect("/provision")
-    return render_template(
-        "provision.html", changes=call({"action": "provision_plans"})
+    data = call({"action": "status"})
+    used = {i for l in data["labs"] for i in l.get("gpu_indices", [l["gpu"]])}
+    default_gpu = next(
+        (
+            g["index"]
+            for g in sorted(data["gpus"], key=lambda g: -g["index"])
+            if g["index"] not in used and not g["util"] and g["used"] <= 32
+        ),
+        None,
     )
+    return render_template(
+        "provision.html",
+        changes=call({"action": "provision_plans"}),
+        data=data,
+        default_gpu=default_gpu,
+    )
+
+
+@app.post("/provision/prepare")
+def provision_prepare():
+    fields = [
+        "id",
+        "title",
+        "new_user",
+        "password",
+        "source_container",
+        "gpu_index",
+        "storage_gb",
+        "storage_name",
+        "ack_shared",
+        "display_name",
+        "student_id",
+        "email",
+        "notes",
+    ]
+    req = {k: request.form.get(k, "") for k in fields}
+    req["action"] = "provision_prepare"
+    try:
+        flash(call(req)["message"], "success")
+    except (ValueError, OSError) as e:
+        flash(str(e), "error")
+    return redirect("/provision")
 
 
 @app.get("/api/provision")
@@ -309,6 +342,15 @@ def hot_action():
     fields = [
         "ack_downtime",
         "ack_recreate",
+        "ack_environment",
+        "ack_shared",
+        "expected_fingerprint",
+        "display_name",
+        "student_id",
+        "email",
+        "joined_on",
+        "expires_on",
+        "notes",
         "expected_id",
         "expected_started",
         "title",
@@ -328,17 +370,23 @@ def hot_action():
         "gpu_selection",
     ]
     req = {k: request.form.get(k) for k in fields}
+    if req.get("action") == "gpu_reconfigure":
+        req["gpu_selection"] = ",".join(request.form.getlist("gpu_selection"))
     try:
         flash(call(req)["message"], "success")
     except (ValueError, OSError) as e:
         flash(str(e), "error")
     target = {
+        "account_metadata": "accounts",
+        "account_create": "accounts",
+        "gpu_reconfigure": "gpu",
         "maintenance_restart": "maintenance",
         "maintenance_recreate": "maintenance",
         "resources": "limits",
         "backup": "backups",
         "adduser": "accounts",
         "profile_save": "images",
+        "environment_apply": "images",
     }.get(req["action"], "overview")
     return redirect(url_for("lab_page", lab_id=req.get("lab", ""), section=target))
 

@@ -35,3 +35,11 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - An isolated GPU 0 test container on a disposable ext4 filesystem was recreated with its data intact. A deliberately failed new-container start restored the original container and preserved the same file.
 - Production laboratory containers were not restarted or recreated. Full host/broker crash recovery remains untested and requires administrator inspection.
 - Restart persistence passed on the same disposable environment. Browser checks covered current storage paths, Korean/English maintenance screens, and recreation confirmation cancellation; no browser errors were observed. All eight production container IDs and start timestamps remained unchanged. Disposable containers, mount, disk and units were removed.
+
+## 0.5.5 administration and visual resource map
+
+- Automated tests cover file traversal/symlink/hardlink rejection, account metadata, versioned guide generation without passwords, official image references, GPU configuration payloads, stale-state and downtime confirmations.
+- Live mutation verification is restricted to temporary GPU 0 containers and a 64 MiB ext4 test mount. Production laboratory container IDs and start timestamps are compared before and after.
+- Verified account creation, official CUDA image replacement, home-data persistence, writable-root snapshot recreation, restart recovery and rollback on an injected second-container start failure.
+- GPU payload mapping is unit-tested for multiple GPUs; live reassignment testing retains GPU 0 only. No production laboratory GPU is reassigned for validation.
+- Korean/English PDFs are rendered and inspected. No full-host reboot, crash-during-transaction recovery, every provider image tag, or clean-host installation is claimed.

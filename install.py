@@ -194,6 +194,7 @@ def install():
         json.dumps(
             dict(
                 username=username,
+                access_host=host,
                 secret=secrets.token_urlsafe(48),
                 password_hash=f"pbkdf2:sha256:1000000${salt}${hashed}",
             )

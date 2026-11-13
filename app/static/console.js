@@ -325,21 +325,3 @@ if (resourceUser) {
     .forEach((s) => s.addEventListener("input", preview));
   preview();
 }
-
-const documentLanguage = document.querySelector("#document-language");
-if (documentLanguage) {
-  let previous = documentLanguage.value;
-  documentLanguage.addEventListener("change", async () => {
-    try {
-      const response = await fetch("/api/document-defaults");
-      if (!response.ok) return;
-      const d = await response.json();
-      for (const key of ["environment", "permissions"]) {
-        const el = document.querySelector("#" + key);
-        if (el.value === (d[key + "_" + previous] || "") || !el.value)
-          el.value = d[key + "_" + documentLanguage.value] || "";
-      }
-      previous = documentLanguage.value;
-    } catch (e) {}
-  });
-}

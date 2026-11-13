@@ -39,11 +39,24 @@ class RecreateTests(unittest.TestCase):
         )
         self.assertEqual(original, saved)
 
-    def test_writable_environment_rejected(self):
-        with self.assertRaises(ValueError):
-            maintenance.validate(
-                dict(managed=True), {}, dict(HostConfig=dict(ReadonlyRootfs=False))
-            )
+    def test_unsafe_mount_rejected_before_recreation(self):
+        with patch.object(maintenance.os.path, "ismount", return_value=True):
+            with self.assertRaises(ValueError):
+                maintenance.validate(
+                    dict(storage="/data", prefix="test-", users=[{"name": "u"}]),
+                    {"name": "u"},
+                    dict(
+                        HostConfig={},
+                        Mounts=[
+                            dict(
+                                Type="volume",
+                                Source="/elsewhere",
+                                Destination="/data",
+                                RW=True,
+                            )
+                        ],
+                    ),
+                )
 
     def test_protected_lab_rejected_before_recreation(self):
         with (

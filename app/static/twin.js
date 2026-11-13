@@ -17,6 +17,8 @@
     if (cls) n.className = cls;
     return n;
   };
+  const palette = ['#218c80','#517bd3','#9665bc','#bf843e','#3b92ad','#c06e88'];
+  const labColor = (lab) => palette[data.labs.findIndex(l => l.id === lab.id) % palette.length];
   const indices = (lab) => lab.gpu_indices || [Number(lab.gpu)];
   const owners = (index) =>
     data.labs.filter((l) => indices(l).includes(Number(index)));
@@ -32,8 +34,13 @@
     const button = el("button", undefined, "twin-lab");
     button.type = "button";
     const head = el("div", undefined, "twin-lab-head");
-    head.append(el("span", "▦", "room-symbol"), el("strong", lab.title));
-    button.append(head, el("small", ""), el("div", undefined, "mini-users"));
+    head.append(el("strong", lab.title));
+    const model = el('img', undefined, 'lab-model');
+    model.src = '/static/models/laboratory.svg'; model.alt = ''; model.setAttribute('aria-hidden','true');
+    const body = el('div', undefined, 'lab-body');
+    const meter = el('progress', undefined, 'lab-storage-meter');
+    body.append(head, el('small','', 'lab-resources'), el('div',undefined,'mini-users'), el('div','', 'lab-storage-label'), meter);
+    button.append(model, body);
     button.addEventListener("click", () => selection("lab", lab.id));
     return button;
   }
@@ -78,6 +85,9 @@
         active =
           (activeLab && indices(activeLab).includes(gpu.index)) ||
           (selected?.kind === "gpu" && selected.id === gpu.index);
+      n.style.setProperty('--lab-color', assigned ? labColor(owners(gpu.index)[0]) : '#8294a6');
+      n.classList.toggle('dimmed', !!activeLab && !active);
+      n.classList.toggle('working', Number(gpu.util) > 0);
       n.classList.toggle("assigned", assigned);
       n.classList.toggle("selected", !!active);
       n.setAttribute("aria-pressed", String(!!active));
@@ -103,12 +113,16 @@
         labNodes.set(lab.id, n);
         document.getElementById("twin-laboratories").append(n);
       }
+      n.style.setProperty('--lab-color', labColor(lab));
+      n.classList.toggle('dimmed', !!activeLab && activeLab.id !== lab.id);
       n.querySelector("strong").textContent = lab.title;
+      const meter = n.querySelector('progress');
+      meter.max = Math.max(Number(lab.storage_gb),1); meter.value = lab.used_gb;
+      meter.setAttribute('aria-label',t('저장공간 사용량'));
+      n.querySelector('.lab-storage-label').textContent = t('공유 저장공간') + ' · ' + capacity(lab.used_gb) + ' / ' + capacity(lab.storage_gb);
       n.querySelector("small").textContent =
         "GPU " +
         indices(lab).join(", ") +
-        " · " +
-        capacity(lab.storage_gb) +
         " · " +
         t("사용자") +
         " " +
@@ -118,7 +132,8 @@
       n.querySelector(".mini-users").replaceChildren(
         ...lab.users.map((u) => {
           const dot = el("i", undefined, u.status === "running" ? "live" : "");
-          dot.title = u.name;
+          dot.title = u.name + ' · ' + t(u.status === 'running' ? '실행 중' : '정지');
+          dot.setAttribute('aria-label',dot.title);
           return dot;
         }),
       );
@@ -140,6 +155,7 @@
   function details(lab) {
     if (!selected) return;
     const box = document.getElementById("twin-detail");
+    box.classList.remove('empty-detail');
     const oldFocus = document.activeElement?.dataset?.detailAction;
     const nodes = [];
     const row = (label, value) => {
@@ -186,6 +202,8 @@
         link("연구실 관리", url),
         link("사용자 관리", url + "/accounts"),
         link("자원 배정", url + "/resources"),
+        link("환경 관리", url + "/maintenance"),
+        link("파일 탐색", url + "/files"),
         link("이용 안내서", "/manual?lab=" + encodeURIComponent(lab.id)),
       );
       nodes.push(actions);
@@ -245,6 +263,8 @@
           "http://www.w3.org/2000/svg",
           "path",
         );
+        p.style.setProperty('--lab-color', labColor(lab));
+        if (selected?.kind === 'lab' && selected.id !== lab.id) p.classList.add('dimmed');
         p.setAttribute(
           "d",
           `M ${x} ${y} C ${x + 30} ${y}, ${tx - 30} ${ty}, ${tx} ${ty}`,
@@ -285,6 +305,12 @@
       if (!document.hidden) timer = setTimeout(sync, retry);
     }
   }
+  document.getElementById('twin-reset').addEventListener('click', () => {
+    selected = null;
+    const box = document.getElementById('twin-detail');
+    box.replaceChildren(el('h2','자원 연결'),el('p','연구실 또는 GPU 선택 후 상세 정보와 관리 항목을 확인할 수 있습니다.'));
+    box.classList.add('empty-detail'); render();
+  });
   new ResizeObserver(wires).observe(document.getElementById("twin-map"));
   document
     .getElementById("twin-laboratories")

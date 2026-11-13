@@ -30,22 +30,20 @@ def inspect(name):
 
 def authorize(c, action, lab, user=None):
     if action in {"create", "recreate"}:
-        raise PermissionError("컨테이너 생성·재생성은 비활성화되어 있습니다.")
+        raise PermissionError(
+            "생성은 연구실 생성 화면에서, 재생성은 환경 관리 화면에서 실행하세요."
+        )
     if action not in {"start", "stop", "password", "gpu_test", "grow"}:
         raise ValueError("지원하지 않는 작업입니다.")
     if lab not in c["labs"]:
         raise ValueError("등록되지 않은 연구실입니다.")
     if lab not in c["write_labs"]:
-        raise PermissionError("검증 중 보호 대상입니다. 조회만 허용됩니다.")
+        raise PermissionError("관리 권한이 없는 연구실입니다.")
     spec = c["labs"][lab]
     if spec["gpu"] not in c["write_gpus"]:
         raise PermissionError("변경 허용 GPU가 아닙니다.")
     if user is not None and user not in [u["name"] for u in spec["users"]]:
         raise PermissionError("대상 계정이 연구실에 속하지 않습니다.")
-    if action == "gpu_test" and not spec.get("sandbox"):
-        raise PermissionError(
-            "이 버전의 생성·재생성·연산 검사는 시험 환경에서만 지원합니다."
-        )
     return spec
 
 
@@ -68,7 +66,7 @@ def audit(action, lab, user, result):
 
 
 def checked_container(c, s, u):
-    name = s["prefix"] + u["name"]
+    name = u.get("container", s["prefix"] + u["name"])
     obj = inspect(name)
     if not obj:
         return None
@@ -76,10 +74,10 @@ def checked_container(c, s, u):
         assert obj["Config"]["Labels"].get("h200.console") == "sandbox"
         assert obj["Image"] == c["sandbox_image"]
     requests = obj["HostConfig"]["DeviceRequests"]
-    assert len(requests) == 1 and requests[0]["DeviceIDs"] == [s["gpu"]]
+    assert len(requests) == 1 and requests[0]["DeviceIDs"] == s.get("gpus", [s["gpu"]])
     assert obj["HostConfig"]["Privileged"] is False
     expected_devices = {
-        "/dev/nvidia" + str(s["index"]),
+        *("/dev/nvidia" + str(i) for i in s.get("indices", [s["index"]])),
         "/dev/nvidiactl",
         "/dev/nvidia-uvm",
         "/dev/nvidia-uvm-tools",
@@ -113,6 +111,7 @@ def snapshot():
             users.append(
                 dict(
                     name=u["name"],
+                    profile=__import__("account_profile").public(u),
                     port=u["port"],
                     status=obj["State"]["Status"] if obj else "未作成",
                     started=obj["State"]["StartedAt"] if obj else "",
@@ -184,6 +183,17 @@ def snapshot():
         memory_used_gib=round((mem["MemTotal"] - mem["MemAvailable"]) / 1048576, 1),
         memory_total_gib=round(mem["MemTotal"] / 1048576),
         cpu_count=os.cpu_count(),
+        cpu_model=next(
+            (
+                l.split(":", 1)[1].strip()
+                for l in pathlib.Path("/proc/cpuinfo").read_text().splitlines()
+                if l.startswith("model name")
+            ),
+            "N/A",
+        )
+        + " / "
+        + str(os.cpu_count())
+        + " threads",
         updated=time.strftime("%H:%M:%S"),
         mode="LabHarbor",
     )
@@ -194,11 +204,11 @@ def snapshot():
 GPU_PROBE = """import ctypes,json
 c=ctypes.CDLL('libcuda.so.1')
 def ok(v):assert v==0,v
-ok(c.cuInit(0));n=ctypes.c_int();ok(c.cuDeviceGetCount(ctypes.byref(n)));assert n.value==1
+ok(c.cuInit(0));n=ctypes.c_int();ok(c.cuDeviceGetCount(ctypes.byref(n)));assert n.value>=1
 d=ctypes.c_int();ok(c.cuDeviceGet(ctypes.byref(d),0));ctx=ctypes.c_void_p();ok(c.cuCtxCreate_v2(ctypes.byref(ctx),0,d))
 p=ctypes.c_uint64();ok(c.cuMemAlloc_v2(ctypes.byref(p),ctypes.c_size_t(16)))
 ok(c.cuMemsetD8_v2(p,65,16));b=ctypes.create_string_buffer(16);ok(c.cuMemcpyDtoH_v2(b,p,16));assert b.raw==b'A'*16
-ok(c.cuMemFree_v2(p));ok(c.cuCtxDestroy_v2(ctx));print('CUDA PASS: one GPU, allocation and transfer')"""
+ok(c.cuMemFree_v2(p));ok(c.cuCtxDestroy_v2(ctx));print('CUDA PASS: allocation and transfer; visible GPUs:',n.value)"""
 
 
 def operate(req):
@@ -294,21 +304,35 @@ class Handler(socketserver.StreamRequestHandler):
             with LOCK:
                 if req.get("action") == "status":
                     result = snapshot()
+                elif req.get("action") == "files":
+                    import filebrowser
+
+                    result = filebrowser.inspect(req)
                 elif req.get("action") == "catalog":
                     import hotops
 
                     result = hotops.catalog()
-                elif req.get("action") in {"provision_plans", "provision_submit"}:
+                elif req.get("action") in {
+                    "provision_plans",
+                    "provision_submit",
+                    "provision_prepare",
+                }:
                     import lifecycle
 
                     result = (
                         lifecycle.plans()
                         if req["action"] == "provision_plans"
+                        else lifecycle.prepare(req)
+                        if req["action"] == "provision_prepare"
                         else lifecycle.submit(req)
                     )
                     CACHE.clear()
                 elif req.get("action") in {
                     "metadata",
+                    "account_metadata",
+                    "account_create",
+                    "environment_apply",
+                    "gpu_reconfigure",
                     "maintenance_restart",
                     "maintenance_recreate",
                     "resources",

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-[[ "$RESEARCH_USER" =~ ^[a-z][a-z0-9_]{1,30}$ ]] || exit 1
+[[ "$RESEARCH_USER" =~ ^[a-zA-Z][a-zA-Z0-9_-]{1,30}$ ]] || exit 1
 id "$RESEARCH_USER" >/dev/null
 mkdir -p /run/sshd
 cat > /run/sshd_config <<EOF

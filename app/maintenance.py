@@ -1,7 +1,8 @@
-"""Recreate a managed read-only environment from its existing immutable image.
+"""Recreate a registered environment while preserving persistent bind mounts.
 
-Persistent bind mounts are never moved, formatted or deleted. Writable roots,
-anonymous volumes, shared account containers and static addresses are excluded.
+Persistent bind mounts are never moved, formatted or deleted. Writable roots are
+snapshotted. Anonymous volumes, shared account containers and static addresses
+require a separate migration.
 """
 
 import copy
@@ -53,10 +54,6 @@ def mount_signature(o):
 
 
 def validate(spec, user, o):
-    if not spec.get("managed") or not o["HostConfig"].get("ReadonlyRootfs"):
-        raise ValueError(
-            "현재 기능은 관리형 읽기 전용 환경의 동일 구성 재생성만 지원합니다."
-        )
     if sum(hotops.name(spec, u) == hotops.name(spec, user) for u in spec["users"]) != 1:
         raise ValueError("여러 사용자가 공유하는 환경은 별도 이전이 필요합니다.")
     storage = pathlib.Path(spec["storage"]).resolve()
@@ -73,7 +70,10 @@ def validate(spec, user, o):
         raise ValueError("현재 환경의 저장 설정은 재생성을 지원하지 않습니다.")
     if any(n.get("IPAMConfig") for n in o["NetworkSettings"]["Networks"].values()):
         raise ValueError("고정 네트워크 환경은 별도 이전이 필요합니다.")
-    if not re.fullmatch(r"labharbor-[a-z][a-z0-9-]*\.service", spec.get("service", "")):
+    if not re.fullmatch(
+        r"(?:labharbor-[a-z][a-z0-9-]*|h200-research[0-9]*)\.service",
+        spec.get("service", ""),
+    ):
         raise ValueError("연결된 복구 서비스를 확인하세요.")
 
 
@@ -122,7 +122,7 @@ def create_payload(o):
     return payload
 
 
-def recreate(req, c, spec, user, original):
+def recreate(req, c, spec, user, original, resource_limits=None):
     if req.get("ack_downtime") != "yes" or req.get("ack_recreate") != "yes":
         raise ValueError("작업 중단과 동일 구성 재생성을 모두 확인해야 합니다.")
     if (
@@ -137,7 +137,9 @@ def recreate(req, c, spec, user, original):
     token = uuid.uuid4().hex[:12]
     old_name = name + "-rollback-" + token
     service = spec["service"]
-    timer = service.removesuffix(".service") + ".timer"
+    import recovery
+
+    service, timer, recovery_worker = recovery.units(spec)
     timer_active = (
         subprocess.run(["systemctl", "is-active", "--quiet", timer]).returncode == 0
     )
@@ -157,6 +159,7 @@ def recreate(req, c, spec, user, original):
     renamed = False
     created_id = None
     api = ""
+    recovery_files = {}
 
     def state(value):
         record["state"] = value
@@ -168,7 +171,7 @@ def recreate(req, c, spec, user, original):
         if not re.fullmatch(r"1\.\d+", version):
             raise ValueError("Docker API 버전을 확인하세요.")
         api = "/v" + version
-        hotops.run("systemctl", "stop", timer, service)
+        hotops.run("systemctl", "stop", timer, recovery_worker)
         if original["State"]["Running"]:
             engine("POST", api + "/containers/" + original["Id"] + "/stop?t=15")
         engine(
@@ -181,10 +184,23 @@ def recreate(req, c, spec, user, original):
         )
         renamed = True
         state("original_retained")
+        desired = create_payload(original)
+        if resource_limits is not None:
+            desired["HostConfig"].update(resource_limits)
+        if not original["HostConfig"].get("ReadonlyRootfs"):
+            desired["Image"] = hotops.run(
+                "docker",
+                "commit",
+                original["Id"],
+                "labharbor-snapshot:" + token,
+                timeout=300,
+            )
+            record["snapshot_image"] = desired["Image"]
+            state("snapshot_saved")
         result = engine(
             "POST",
             api + "/containers/create?name=" + quote(name, safe=""),
-            create_payload(original),
+            desired,
         )
         created_id = result["Id"]
         record["created_id"] = created_id
@@ -192,7 +208,7 @@ def recreate(req, c, spec, user, original):
         if original["State"]["Running"]:
             engine("POST", api + "/containers/" + created_id + "/start")
         current = hotops.obj(created_id)
-        if current["Image"] != original["Image"] or mount_signature(
+        if current["Image"] != desired["Image"] or mount_signature(
             current
         ) != mount_signature(original):
             raise ValueError("개발환경 또는 저장 연결 검증에 실패했습니다.")
@@ -205,7 +221,7 @@ def recreate(req, c, spec, user, original):
             "ReadonlyRootfs",
             "Devices",
         ]:
-            if current["HostConfig"].get(key) != original["HostConfig"].get(key):
+            if current["HostConfig"].get(key) != desired["HostConfig"].get(key):
                 raise ValueError("자원 설정 검증에 실패했습니다.")
         if original["State"]["Running"]:
             for attempt in range(20):
@@ -232,6 +248,15 @@ def recreate(req, c, spec, user, original):
                         raise
                     time.sleep(0.5)
         state("verified")
+        if (
+            current["Image"] != original["Image"]
+            and recovery.recovery_path(req["lab"]).exists()
+        ):
+            recovery_files = recovery.install(
+                req["lab"],
+                spec,
+                [hotops.obj(hotops.name(spec, u)) for u in spec["users"]],
+            )
         # The old container is retained stopped for administrator recovery; its
         # immutable image and persistent binds are also recorded in the journal.
         if timer_active:
@@ -242,6 +267,8 @@ def recreate(req, c, spec, user, original):
         }
     except Exception:
         try:
+            if recovery_files:
+                recovery.restore(recovery_files)
             if created_id:
                 engine(
                     "DELETE", api + "/containers/" + created_id + "?force=true&v=false"

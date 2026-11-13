@@ -44,6 +44,7 @@
                     ? " GB"
                     : ""),
           );
+      if (fields.getAll('gpu_selection').length) add('배정 GPU', fields.getAll('gpu_selection').map(v=>'GPU '+v).join(', '));
       if (form.dataset.current) add("현재 설정", form.dataset.current);
       dialog.append(list, node("p", form.dataset.review));
       const buttons = document.createElement("div");

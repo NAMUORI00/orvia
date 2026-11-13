@@ -87,6 +87,14 @@ def validate(p, c):
         raise ValueError("Invalid user ID")
     if p["gpu"] not in c["write_gpus"]:
         raise PermissionError("GPU is protected")
+    for spec in c["labs"].values():
+        for user in spec["users"]:
+            if (
+                user.get("name") == p["user"]
+                or user.get("uid") == p["uid"]
+                or user.get("port") == p["port"]
+            ):
+                raise ValueError("Account, UID or port is already allocated")
     if p["id"] in c["labs"]:
         raise ValueError("Lab already exists")
     if not 1 <= int(p["storage_gb"]) <= int(c.get("provision_max_gb", 0)):
@@ -157,7 +165,10 @@ def network(p):
 
 
 def firewall(p):
-    bridge, chain = "lh" + str(p["uid"]), "LH" + str(p["uid"])
+    bridge, chain = (
+        p.get("bridge", "lh" + str(p["uid"])),
+        p.get("chain", "LH" + str(p["uid"])),
+    )
     if (
         subprocess.run(
             ["iptables", "-w", "-S", chain],
@@ -254,7 +265,9 @@ def worker(p, job):
             o = hotops.obj(ident)
             if o["Name"].lstrip("/") not in old_names:
                 for r in o["HostConfig"].get("DeviceRequests") or []:
-                    if r.get("Count") == -1 or p["gpu"] in (r.get("DeviceIDs") or []):
+                    if (
+                        r.get("Count") == -1 or p["gpu"] in (r.get("DeviceIDs") or [])
+                    ) and not p.get("allow_shared_gpu", False):
                         raise ValueError("GPU already used by another container")
         if old:
             import broker
@@ -290,7 +303,7 @@ def worker(p, job):
         if hotops.obj(source)["Id"] != p["source_image_id"]:
             raise ValueError("Approved source image changed")
         (stage / "Dockerfile").write_text(
-            f"FROM {source}\nRUN groupadd -g {p['uid']} {p['user']} && useradd -u {p['uid']} -g {p['uid']} -M -s /bin/bash {p['user']}\n"
+            f"FROM {hotops.build_source(source)}\nRUN groupadd -g {p['uid']} {p['user']} && useradd -u {p['uid']} -g {p['uid']} -M -s /bin/bash {p['user']}\n"
             "COPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
         )
         image = run("docker", "build", "-q", "--network=none", str(stage), timeout=300)
@@ -464,7 +477,14 @@ def worker(p, job):
             title=p["title"],
             index=p["index"],
             gpu=p["gpu"],
-            users=[dict(name=p["user"], uid=p["uid"], port=p["port"])],
+            users=[
+                dict(
+                    name=p["user"],
+                    uid=p["uid"],
+                    port=p["port"],
+                    profile=p.get("profile", {}),
+                )
+            ],
             storage=str(base),
             disk=str(disk),
             prefix="lh-" + p["id"] + "-",
@@ -601,3 +621,106 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 3 and sys.argv[1] == "recover":
         recover(sys.argv[2])
+
+
+def prepare(req):
+    """Create a private hashed plan from authenticated UI fields and registered images."""
+    import crypt, pwd, socket
+
+    c = hotops.cfg()
+    key = req.get("id", "")
+    name = req.get("new_user", "")
+    title = req.get("title", "").strip()
+    if not re.fullmatch("[a-z][a-z0-9-]{2,23}", key) or not 1 <= len(title) <= 100:
+        raise ValueError("연구실 ID와 이름을 확인하세요.")
+    if not re.fullmatch("[a-z][a-z0-9_]{1,30}", name):
+        raise ValueError("계정 ID를 확인하세요.")
+    password = req.get("password", "")
+    if not 8 <= len(password) <= 128 or any(ord(x) < 32 for x in password):
+        raise ValueError("8자 이상의 비밀번호를 입력하세요.")
+    if any(u["name"] == name for s in c["labs"].values() for u in s["users"]):
+        raise ValueError("이미 존재하는 계정입니다.")
+    options = {
+        hotops.name(s, u): (s, u) for s in c["labs"].values() for u in s["users"]
+    }
+    if req.get("source_container") not in options:
+        raise ValueError("기준 개발환경을 선택하세요.")
+    source = hotops.obj(req["source_container"])
+    image = source["Image"]
+    actual = dict(
+        line.strip().split(", ")
+        for line in run(
+            "nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader"
+        ).splitlines()
+    )
+    index = str(req.get("gpu_index", ""))
+    if index not in actual:
+        raise ValueError("GPU를 선택하세요.")
+    gpu = actual[index]
+    usage = __import__("reconfigure").inventory()[int(index)]
+    if (usage["util"] > 0 or usage["used"] > 32) and req.get("ack_shared") != "yes":
+        raise ValueError("사용 중인 GPU의 공유 배정을 확인하세요.")
+    if (
+        any(gpu in s.get("gpus", [s["gpu"]]) for s in c["labs"].values())
+        and req.get("ack_shared") != "yes"
+    ):
+        raise ValueError("이미 배정된 GPU의 공유 사용을 확인하세요.")
+    pending = [read_plan(p.stem) for p in PLANS.glob("*.json")]
+    if any(p["user"] == name for p in pending):
+        raise ValueError("같은 계정의 생성 설정이 이미 있습니다.")
+    used = (
+        {u["uid"] for s in c["labs"].values() for u in s["users"]}
+        | {u.pw_uid for u in pwd.getpwall()}
+        | {p["uid"] for p in pending}
+    )
+    uid = next(i for i in range(12000, 60001) if i not in used)
+    bindings = source["HostConfig"].get("PortBindings", {}).get("2222/tcp")
+    if not bindings:
+        raise ValueError("SSH 기반 연구환경을 선택하세요.")
+    host = bindings[0].get("HostIp") or "0.0.0.0"
+    port = None
+    ports = {u["port"] for s in c["labs"].values() for u in s["users"]} | {
+        p["port"] for p in pending
+    }
+    for candidate in range(2201, 65000):
+        if candidate in ports:
+            continue
+        with socket.socket() as sock:
+            try:
+                sock.bind((host, candidate))
+                port = candidate
+                break
+            except OSError:
+                continue
+    if port is None:
+        raise ValueError("사용 가능한 접속 포트가 없습니다.")
+    import account_profile
+
+    profile = account_profile.clean(req)
+    profile["joined_on"] = profile["joined_on"] or time.strftime("%Y-%m-%d")
+    p = dict(
+        id=key,
+        title=title,
+        user=name,
+        uid=uid,
+        port=port,
+        bind_ip=host,
+        gpu=gpu,
+        index=int(index),
+        storage_gb=int(req.get("storage_gb", 0)),
+        storage_name=req.get("storage_name") or key,
+        source_image=image,
+        source_image_id=image,
+        password_hash=crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512)),
+        profile=profile,
+        replace=None,
+        allow_shared_gpu=req.get("ack_shared") == "yes",
+    )
+    validate(p, c)
+    storage_paths(pathlib.Path(c["provision_root"]), p)
+    PLANS.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path = PLANS / (key + ".json")
+    if path.exists():
+        raise ValueError("같은 ID의 생성 설정이 이미 있습니다.")
+    hotops.save(path, p)
+    return {"message": "연구실 생성 설정을 준비했습니다. 내용을 확인하고 적용하세요."}

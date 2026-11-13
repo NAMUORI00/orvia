@@ -2,12 +2,12 @@
 <section class="page-head"><div><p class="eyebrow">LABHARBOR</p><h1>서버 현황</h1></div><a class="button" href="/provision">연구실 생성</a></section>
 <div class="twin-metrics"><div><span>연구실</span><strong id="twin-labs">{{data.labs|length}}</strong></div><div><span>사용자</span><strong id="twin-users">{{data.labs|map(attribute='users')|map('length')|sum}}</strong></div><div><span>미배정 GPU</span><strong id="twin-free">—</strong></div><div><span>시스템 메모리</span><strong id="twin-memory">{{data.memory_used_gib}} / {{data.memory_total_gib}} GiB</strong></div><div class="twin-sync"><span id="twin-sync">실시간 동기화</span><small id="twin-time">{{data.updated}}</small></div></div>
 <section class="twin-workspace" id="twin" data-state='{{data|tojson}}'>
-<div class="twin-map" id="twin-map"><div class="twin-map-head"><h2>자원 배치도</h2><span>● 배정 · ○ 미배정</span></div>
+<div class="twin-map" id="twin-map"><div class="twin-map-head"><h2>자원 배치도</h2><div class="map-tools"><span>● 배정 · ○ 미배정</span><button id="twin-reset" type="button">전체 자원</button></div></div>
 <svg class="twin-wires" id="twin-wires" aria-hidden="true"></svg>
-<div class="twin-rack"><svg class="rack-roof" viewBox="0 0 240 65" aria-hidden="true"><path d="M0 33 175 0 240 30 65 65Z" fill="#bed0da"/></svg><div class="rack-face"><div class="rack-brand">● GPU SERVER</div><div id="twin-gpus"></div><div class="rack-base"><span>CPU 스레드</span><strong>{{data.cpu_count}}</strong><span>시스템 메모리</span><strong>{{data.memory_total_gib}} GiB</strong></div></div></div>
-<div class="twin-laboratories" id="twin-laboratories"></div>
+<div class="twin-rack"><svg class="rack-roof" viewBox="0 0 240 65" aria-hidden="true"><path d="M0 33 175 0 240 30 65 65Z" fill="#bed0da"/></svg><div class="rack-face"><div class="rack-brand"><span class="rack-power"></span> GPU SERVER <span class="rack-vents" aria-hidden="true">▥▥▥</span></div><div id="twin-gpus"></div><div class="rack-base"><span>CPU 스레드</span><strong>{{data.cpu_count}}</strong><span>시스템 메모리</span><strong>{{data.memory_total_gib}} GiB</strong></div></div></div>
+<div class="twin-map-caption">GPU 서버 → 연구실 · 사용자 · 공유 저장공간</div><div class="twin-laboratories" id="twin-laboratories"></div>
 </div>
-<aside class="twin-detail" aria-label="선택 상세"><div id="twin-detail"><div class="twin-empty"><div class="empty-cube">▦</div><h2>연구실 선택</h2><p>연구실 또는 GPU 선택 후 상세 정보와 관리 항목을 확인할 수 있습니다.</p></div></div></aside>
+<aside class="twin-detail" aria-label="선택 상세"><div id="twin-detail"><div class="twin-empty"><img class="empty-model" src="/static/models/laboratory.svg" alt=""><h2>자원 연결</h2><p>연구실 또는 GPU 선택 후 상세 정보와 관리 항목을 확인할 수 있습니다.</p></div></div></aside>
 </section>
 <noscript><a href="/labs">연구실 관리</a></noscript>
 <script defer src="/static/twin.js"></script>

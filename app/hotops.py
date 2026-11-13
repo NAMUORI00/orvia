@@ -74,6 +74,7 @@ def catalog():
             users.append(
                 dict(
                     name=u["name"],
+                    profile=__import__("account_profile").public(u),
                     container=name(s, u),
                     cpu=h.get("NanoCpus", 0) / 1e9 or None,
                     ram=h.get("Memory", 0) / 1073741824 or None,
@@ -85,7 +86,15 @@ def catalog():
                 )
             )
         result.append(
-            dict(id=key, title=s["title"], users=users, writable=key in c["write_labs"])
+            dict(
+                id=key,
+                title=s["title"],
+                users=users,
+                writable=key in c["write_labs"],
+                fingerprint=__import__("reconfigure").fingerprint(
+                    [lookup[name(s, u)] for u in s["users"] if name(s, u) in lookup]
+                ),
+            )
         )
     jobs = []
     for p in sorted(
@@ -141,6 +150,24 @@ def catalog():
 
 
 def dispatch(req):
+    if req.get("action") == "environment_apply":
+        return __import__("environments").submit(req)
+
+    if req.get("action") == "account_create":
+        return __import__("accounts").submit(req)
+
+    if req.get("action") == "gpu_reconfigure":
+        return __import__("reconfigure").submit(req)
+
+    if req.get("action") == "account_metadata":
+        c, s, u, o = authorize(req)
+        import account_profile
+
+        profile = account_profile.clean(req)
+        u["profile"] = {**u.get("profile", {}), **profile}
+        save(ETC / "policy.json", c)
+        return {"message": "계정 정보를 저장했습니다."}
+
     if req.get("action") == "metadata":
         c = cfg()
         lab = req.get("lab")
@@ -231,28 +258,108 @@ def dispatch(req):
             )
             // 1048576
         )
-        if not 0.25 <= cpu <= os.cpu_count() or not 1 <= ram <= total:
+        if not (cpu == 0 or 0.25 <= cpu <= os.cpu_count()) or not (
+            ram == 0 or 1 <= ram <= total
+        ):
             raise ValueError("자원 한도를 확인하세요.")
-        # Reject reductions on a running container: avoid unexpected OOM termination.
         oldram = o["HostConfig"].get("Memory", 0)
-        if o["State"]["Running"] and (oldram == 0 or ram * 1073741824 < oldram):
-            raise ValueError("실행 중인 계정의 메모리 한도 축소는 허용하지 않습니다.")
-        before = (o["Id"], o["State"]["StartedAt"])
-        run(
-            "docker",
-            "update",
-            "--cpus",
-            str(cpu),
-            "--memory",
-            str(ram) + "g",
-            "--memory-swap",
-            str(ram) + "g",
-            name(s, u),
+        releasing = (
+            cpu == 0
+            and (
+                o["HostConfig"].get("NanoCpus", 0)
+                or o["HostConfig"].get("CpuQuota", 0) > 0
+            )
+        ) or (ram == 0 and oldram > 0)
+        if releasing:
+            if req.get("ack_downtime") != "yes":
+                raise ValueError(
+                    "자원 한도 해제에는 사용자 환경 재생성 확인이 필요합니다."
+                )
+            import maintenance
+
+            approved = dict(
+                req,
+                ack_recreate="yes",
+                expected_id=o["Id"][:12],
+                expected_started=o["State"]["StartedAt"],
+            )
+            maintenance.recreate(
+                approved,
+                c,
+                s,
+                u,
+                o,
+                resource_limits=dict(
+                    NanoCpus=int(cpu * 1e9),
+                    CpuQuota=0,
+                    CpuPeriod=0,
+                    Memory=ram * 1073741824,
+                    MemorySwap=ram * 1073741824 if ram else -1,
+                ),
+            )
+            return {"message": "CPU·메모리 한도를 적용했습니다."}
+        shrinking = bool(
+            o["State"]["Running"] and ram and (oldram == 0 or ram * 1073741824 < oldram)
         )
-        after = obj(name(s, u))
-        if before != (after["Id"], after["State"]["StartedAt"]):
-            raise ValueError("컨테이너 실행 상태가 바뀌었습니다. 확인이 필요합니다.")
-        return {"message": "재시작 없이 CPU·메모리 한도를 적용했습니다."}
+        if shrinking and req.get("ack_downtime") != "yes":
+            raise ValueError(
+                "메모리 한도 축소에는 사용자 환경 재시작 확인이 필요합니다."
+            )
+        if not JOB_LOCK.acquire(blocking=False):
+            raise ValueError("다른 관리 작업이 진행 중입니다.")
+        import recovery
+
+        active = False
+        paused = False
+        stopped = False
+
+        def limits(cpus, memory, swap):
+            run(
+                "docker",
+                "update",
+                "--cpus",
+                str(cpus),
+                "--memory",
+                str(memory),
+                "--memory-swap",
+                str(swap),
+                name(s, u),
+            )
+
+        try:
+            if shrinking:
+                active = recovery.pause(s)
+                paused = True
+                run("docker", "stop", "-t", "15", name(s, u))
+                stopped = True
+            limits(cpu, ram * 1073741824, ram * 1073741824 if ram else -1)
+            if stopped:
+                run("docker", "start", name(s, u))
+            after = obj(name(s, u))
+            if after["Id"] != o["Id"] or __import__("maintenance").mount_signature(
+                after
+            ) != __import__("maintenance").mount_signature(o):
+                raise ValueError("환경 상태가 변경되었습니다.")
+            if not shrinking and after["State"]["StartedAt"] != o["State"]["StartedAt"]:
+                raise ValueError("환경 실행 상태가 변경되었습니다.")
+            return {"message": "CPU·메모리 한도를 적용했습니다."}
+        except Exception:
+            if stopped:
+                if obj(name(s, u))["State"]["Running"]:
+                    run("docker", "stop", "-t", "15", name(s, u))
+                limits(
+                    o["HostConfig"].get("NanoCpus", 0) / 1e9,
+                    oldram,
+                    o["HostConfig"].get("MemorySwap", 0),
+                )
+                run("docker", "start", name(s, u))
+            raise
+        finally:
+            try:
+                if paused:
+                    recovery.resume(s, active)
+            finally:
+                JOB_LOCK.release()
     if req["action"] == "adduser":
         if o["HostConfig"]["ReadonlyRootfs"]:
             raise ValueError(
@@ -462,3 +569,13 @@ def register(req):
     return {
         "message": "기존 환경을 연구실로 등록했습니다. 컨테이너는 변경하지 않았습니다."
     }
+
+
+def build_source(image):
+    """BuildKit treats FROM sha256:... as a registry tag; pin a local alias."""
+    digest = json.loads(run("docker", "image", "inspect", image))[0]["Id"]
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        raise ValueError("Invalid source image digest")
+    alias = "labharbor-base:" + digest.split(":", 1)[1]
+    run("docker", "image", "tag", digest, alias)
+    return alias
