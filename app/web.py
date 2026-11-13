@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.6.2")
+    return jsonify(status="ok", version="0.6.3")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -482,7 +482,24 @@ def monitor_page():
 def telemetry_api():
     try:
         return jsonify(
-            call({"action": "telemetry", "hours": request.args.get("hours", "2")})
+            call(
+                {
+                    "action": "telemetry",
+                    "hours": request.args.get("hours", "2"),
+                    "start": request.args.get("start"),
+                    "end": request.args.get("end"),
+                }
+            )
         )
     except ValueError as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.post("/api/telemetry/retention")
+def telemetry_retention():
+    try:
+        return jsonify(
+            call({"action": "telemetry_retention", "values": request.get_json()})
+        )
+    except (ValueError, TypeError) as e:
         return jsonify(error=str(e)), 400

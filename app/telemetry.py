@@ -2,6 +2,7 @@
 
 import collections, json, os, pathlib, sqlite3, subprocess, threading, time
 import hotops
+import history_store
 
 INTERVAL = 60
 RETENTION = 7 * 86400
@@ -269,10 +270,7 @@ def collect_forever():
                         "INSERT INTO events VALUES(?,?,?,?)",
                         (current["ts"], subject, kind, detail),
                     )
-                c.execute(
-                    "DELETE FROM samples WHERE ts<?", (current["ts"] - RETENTION,)
-                )
-                c.execute("DELETE FROM events WHERE ts<?", (current["ts"] - RETENTION,))
+                history_store.maintain(c, current["ts"], network_summary)
             previous = current
         except Exception:
             __import__("logging").exception("Infrastructure sample failed")
@@ -336,57 +334,32 @@ def network_summary(samples):
     return sorted(result.values(), key=lambda r: r["rx"] + r["tx"], reverse=True)
 
 
-def read(hours=2):
-    hours = int(hours)
-    if hours not in (2, 24, 168):
-        raise ValueError("Invalid history window")
-    since = int(time.time()) - hours * 3600
-    bucket = max(60, hours * 3600 // 120)
+def read(hours=2, start=None, end=None):
+    now = int(time.time())
+    if start is not None or end is not None:
+        since, until = int(start), int(end)
+        if (
+            since < 0
+            or until <= since
+            or until - since > 31 * 86400
+            or until > now + 86400
+        ):
+            raise ValueError("Select a date range of at most 31 days")
+        historical = True
+    else:
+        hours = int(hours)
+        if hours not in (2, 24, 168):
+            raise ValueError("Invalid history window")
+        since, until, historical = now - hours * 3600, now + 1, False
     with database() as c:
-        network_usage = network_summary(
-            json.loads(r[0])
-            for r in c.execute(
-                "SELECT payload FROM samples WHERE ts>=? ORDER BY ts", (since,)
-            )
-        )
-        rows = c.execute(
-            "SELECT ts,payload FROM samples WHERE ts IN (SELECT MAX(ts) FROM samples WHERE ts>=? GROUP BY CAST((ts-?)/? AS INTEGER)) ORDER BY ts DESC",
-            (since, since, bucket),
-        ).fetchall()
-        events = [
-            dict(ts=r[0], subject=r[1], kind=r[2], lab=r[3])
-            for r in c.execute(
-                "SELECT ts,subject,kind,detail FROM events ORDER BY ts DESC LIMIT 40"
-            )
-        ]
-    data = [json.loads(row[1]) for row in reversed(rows)]
-    return dict(
-        latest=data[-1] if data else None,
-        history=[
-            dict(
-                ts=d["ts"],
-                load=d["load"],
-                memory=d["memory_used"],
-                cpu_util=d.get("cpu_util"),
-                gpu=sum(g["util"] or 0 for g in d["gpus"]) / max(1, len(d["gpus"])),
-                accounts=[
-                    dict(
-                        user=a["user"],
-                        lab=a["lab"],
-                        cpu=a["cpu"],
-                        rx=(a["rates"] or {}).get("rx"),
-                        tx=(a["rates"] or {}).get("tx"),
-                    )
-                    for a in d["accounts"]
-                ],
-            )
-            for d in data
-        ],
-        events=events,
-        interval=INTERVAL,
-        network_usage=network_usage,
-        retention_days=7,
-    )
+        result = history_store.query(c, since, until, network_summary)
+    result["historical"] = historical
+    return result
+
+
+def retention(values=None):
+    with database() as c:
+        return history_store.settings(c, values)
 
 
 def start():

@@ -52,17 +52,45 @@
     ];
   }
   function render() {
-    if (!data?.latest) return;
+    if (!data?.latest) {
+      ["monitor-overview", "monitor-users", "network-ranking"].forEach((id) =>
+        el(id).replaceChildren(),
+      );
+      el("monitor-health").textContent = t("기록 없음");
+      el("monitor-time").textContent = "—";
+      el("monitor-error").textContent = t("선택한 기간에 기록이 없습니다.");
+      el("history-summary").textContent = "";
+      if (el("monitor-detail").open) el("monitor-detail").close();
+      return;
+    }
     const d = data.latest,
       h = data.history,
-      stale = Date.now() / 1000 - d.ts > 180;
+      stale = !data.historical && Date.now() / 1000 - d.ts > 180;
+    el("history-summary").textContent =
+      t(
+        data.archive
+          ? "15분 요약 포함 · 네트워크 합계와 최고 전송률 유지"
+          : "1분 상세 기록",
+      ) +
+      " · " +
+      t("기록 보관") +
+      " " +
+      data.settings.archive_days +
+      " " +
+      t("일");
     el("monitor-time").textContent = new Date(d.ts * 1000).toLocaleString();
     el("monitor-error").textContent = stale
       ? t("수집 지연 · 마지막 기록 표시")
       : "";
     const warning = issues();
     el("monitor-health").textContent = t(
-      stale ? "수집 지연" : warning.length ? "확인 필요" : "모든 환경 실행 중",
+      data.historical
+        ? "과거 기록"
+        : stale
+          ? "수집 지연"
+          : warning.length
+            ? "확인 필요"
+            : "모든 환경 실행 중",
     );
     el("monitor-health").classList.toggle(
       "attention",
@@ -114,7 +142,11 @@
       button.onclick = () => open(p.key === "network" ? "network" : "hardware");
       card.append(button);
       series(card, t(p.name), p.values, p.format, p.color, p.max);
-      const foot = node("span", t("사용 추이"), "metric-caption");
+      const foot = node(
+        "span",
+        t(data.archive ? "평균 사용 추이" : "사용 추이"),
+        "metric-caption",
+      );
       card.append(foot);
       overview.append(card);
     });
@@ -422,7 +454,20 @@
     } else {
       title = t("집계 기준");
       body.append(
-        node("p", t("1분 간격 · 7일 보관 · 실행 상태와 자원 지표만 수집")),
+        node(
+          "p",
+          t("상세 기록") +
+            " " +
+            data.settings.raw_days +
+            " " +
+            t("일") +
+            " · " +
+            t("전체 보관 기간") +
+            " " +
+            data.settings.archive_days +
+            " " +
+            t("일"),
+        ),
         node(
           "p",
           t(
@@ -440,15 +485,37 @@
   el("monitor-info-open").onclick = () => open("info");
   el("monitor-health").onclick = () => data?.latest && open("health");
   function schedule() {
+    clearTimeout(timer);
+    if (el("monitor-window").value === "custom") return;
     timer = setTimeout(() => (document.hidden ? schedule() : load()), 60000);
   }
+  let loadSequence = 0;
   async function load() {
+    const sequence = ++loadSequence;
     try {
-      const r = await fetch(
-        "/api/telemetry?hours=" + el("monitor-window").value,
-      );
+      let query = "hours=" + el("monitor-window").value;
+      if (el("monitor-window").value === "custom") {
+        const start = new Date(el("history-start").value + "T00:00:00");
+        const end = new Date(el("history-end").value + "T00:00:00");
+        end.setDate(end.getDate() + 1);
+        if (
+          !Number.isFinite(+start) ||
+          !Number.isFinite(+end) ||
+          end <= start ||
+          end - start > 31 * 86400000
+        )
+          throw Error(t("날짜 범위는 최대 31일입니다."));
+        query =
+          "start=" +
+          Math.floor(+start / 1000) +
+          "&end=" +
+          Math.floor(+end / 1000);
+      }
+      const r = await fetch("/api/telemetry?" + query);
       if (!r.ok) throw Error(t("지표를 불러오지 못했습니다."));
-      data = await r.json();
+      const next = await r.json();
+      if (sequence !== loadSequence) return;
+      data = next;
       render();
     } catch (e) {
       el("monitor-error").textContent = e.message;
@@ -458,10 +525,59 @@
   }
   el("monitor-window").onchange = () => {
     clearTimeout(timer);
+    el("history-range").hidden = el("monitor-window").value !== "custom";
     load();
   };
+  const today = new Date(),
+    dateValue = new Date(+today - today.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 10);
+  ["history-start", "history-end"].forEach((id) => {
+    el(id).value = dateValue;
+    el(id).max = dateValue;
+  });
+  el("history-range").onsubmit = (e) => {
+    e.preventDefault();
+    load();
+  };
+  el("retention-open").onclick = () => {
+    el("raw-days").value = data?.settings?.raw_days || 7;
+    el("archive-days").value = data?.settings?.archive_days || 90;
+    el("retention-ack").checked = false;
+    el("retention-result").textContent = "";
+    el("retention-dialog").showModal();
+  };
+  el("retention-close").onclick = () => el("retention-dialog").close();
+  el("retention-form").onsubmit = async (e) => {
+    e.preventDefault();
+    if (!el("retention-ack").checked) {
+      el("retention-result").textContent = t("자동 삭제 안내를 확인해 주세요.");
+      return;
+    }
+    try {
+      const r = await fetch("/api/telemetry/retention", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": el("retention-form").elements.csrf.value,
+        },
+        body: JSON.stringify({
+          raw_days: Number(el("raw-days").value),
+          archive_days: Number(el("archive-days").value),
+        }),
+      });
+      if (!r.ok) throw Error(t("저장 실패"));
+      const cfg = await r.json();
+      if (data) data.settings = cfg;
+      el("retention-result").textContent = t(
+        "저장되었습니다. 다음 수집부터 적용됩니다.",
+      );
+    } catch (e) {
+      el("retention-result").textContent = e.message;
+    }
+  };
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
+    if (!document.hidden && el("monitor-window").value !== "custom") {
       clearTimeout(timer);
       load();
     }

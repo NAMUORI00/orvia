@@ -63,3 +63,11 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Ranked received/sent volume uses raw counter deltas before chart downsampling. Container identity changes, counter resets and gaps over three minutes are excluded; measured duration remains explicit.
 - Account selection opens received/sent charts, period totals, sampled peak rate/time and up to 20 recent packet error/drop intervals. No packet payload or destination collection was added.
 - Tests cover restart/reset/gap boundaries, lab-scoped account identity and packet error deltas. Deployment only restarts dashboard services.
+
+## 0.6.3 configurable history
+
+- Added local-date range queries (maximum 31 days), empty-period clearing, and historical views without automatic polling. Events are filtered to the selected interval.
+- Default retention: 7 days of minute detail and 90 days of 15-minute summaries; selectable detail 1/3/7 days and total retention 30/60/90/180 days. Authenticated CSRF-protected settings include automatic-deletion acknowledgement.
+- At most four closed buckets are archived per collection cycle. Unarchived samples are protected from pruning; a predecessor is retained for counter boundaries. SQLite freed pages are reused without full VACUUM.
+- 71 Linux tests passed, including bounded backfill, expiry, average/max preservation, archive/raw network totals, date filtering and settings bounds. Browser verification covered empty dates and saving default retention.
+- Current small-dataset read measurements were 0.8–4.7 ms with approximately 19 MiB peak RSS for the standalone read process. These are not a 90-day production benchmark. Existing research containers are unchanged by dashboard deployment.

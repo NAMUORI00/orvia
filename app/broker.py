@@ -305,7 +305,11 @@ class Handler(socketserver.StreamRequestHandler):
                 if req.get("action") == "status":
                     result = snapshot()
                 elif req.get("action") == "telemetry":
-                    result = __import__("telemetry").read(req.get("hours", 2))
+                    result = __import__("telemetry").read(
+                        req.get("hours", 2), req.get("start"), req.get("end")
+                    )
+                elif req.get("action") == "telemetry_retention":
+                    result = __import__("telemetry").retention(req.get("values"))
                 elif req.get("action") == "storage_usage":
                     result = __import__("storage_usage").get(req)
                 elif req.get("action") == "files":
