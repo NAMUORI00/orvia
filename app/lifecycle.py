@@ -51,6 +51,8 @@ def plans():
                     "port",
                     "replace",
                     "storage_name",
+                    "official_image",
+                    "source_label",
                 )
             }
         )
@@ -59,7 +61,67 @@ def plans():
         plans=result,
         jobs=[j for j in jobs if j.get("kind") == "provision"],
         storage_root=hotops.cfg().get("provision_root", ""),
+        storage_max_gb=hotops.cfg().get("provision_max_gb", 0),
     )
+
+
+def sources():
+    catalog = hotops.catalog()
+    ids = list({u["image"] for lab in catalog["labs"] for u in lab["users"]})
+    images = (
+        {o["Id"]: o for o in json.loads(run("docker", "image", "inspect", *ids))}
+        if ids
+        else {}
+    )
+    result = []
+    seen = set()
+    for lab in catalog["labs"]:
+        for user in lab["users"]:
+            if user["image"] in seen:
+                continue
+            seen.add(user["image"])
+            info = images.get(user["image"], {})
+            tags = [
+                t
+                for t in info.get("RepoTags", []) or []
+                if not t.startswith("labharbor-base:")
+            ]
+            result.append(
+                dict(
+                    title=lab["title"],
+                    source=user["container"],
+                    image=user["image"],
+                    label=tags[0] if tags else user["image"][:19],
+                )
+            )
+    refs = [
+        ref
+        for ref in run(
+            "docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"
+        ).splitlines()
+        if ref.startswith(("nvidia/cuda:", "nvcr.io/nvidia/pytorch:"))
+        and "<none>" not in ref
+    ]
+    bases = []
+    for info in json.loads(run("docker", "image", "inspect", *refs)) if refs else []:
+        layers = info.get("RootFS", {}).get("Layers", [])
+        if not layers or not any(
+            o.get("RootFS", {}).get("Layers", [])[: len(layers)] == layers
+            for o in images.values()
+        ):
+            continue
+        for ref in info.get("RepoTags", []) or []:
+            if ref not in refs:
+                continue
+            repo, tag = ref.rsplit(":", 1)
+            bases.append(
+                dict(
+                    label=ref,
+                    provider="cuda" if repo == "nvidia/cuda" else "pytorch",
+                    tag=tag,
+                )
+            )
+    return dict(registered=result, bases=bases)
 
 
 def storage_name(p):
@@ -300,13 +362,57 @@ def worker(p, job):
         shutil.copy(APP / "research-entrypoint.sh", stage / "entrypoint.sh")
         # No credentials in build layers, command arguments or build logs.
         source = p["source_image"]
-        if hotops.obj(source)["Id"] != p["source_image_id"]:
+        official = p.get("official_image")
+        if official:
+            if official != __import__("environments").reference(
+                p.get("image_provider"), p.get("image_tag")
+            ):
+                raise ValueError("Invalid official image plan")
+            progress("Preparing official provider image")
+            if p.get("official_image_id"):
+                source = hotops.obj(p["official_image_id"])["Id"]
+            else:
+                run("docker", "pull", official, timeout=1800)
+                source = hotops.obj(official)["Id"]
+        elif hotops.obj(source)["Id"] != p["source_image_id"]:
             raise ValueError("Approved source image changed")
-        (stage / "Dockerfile").write_text(
-            f"FROM {hotops.build_source(source)}\nRUN groupadd -g {p['uid']} {p['user']} && useradd -u {p['uid']} -g {p['uid']} -M -s /bin/bash {p['user']}\n"
-            "COPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
+        (stage / "research.sh").write_text(
+            "export PATH=/opt/conda/bin:$PATH\nexport TMPDIR=$HOME/.tmp\nexport XDG_CACHE_HOME=$HOME/.cache\nexport CONDA_ENVS_PATH=$HOME/.conda/envs\n"
         )
-        image = run("docker", "build", "-q", "--network=none", str(stage), timeout=300)
+        setup = (
+            "RUN command -v apt-get && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server python3 python3-venv python3-pip git ca-certificates && rm -rf /var/lib/apt/lists/*\n"
+            if official
+            else ""
+        )
+        (stage / "Dockerfile").write_text(
+            f"FROM {hotops.build_source(source)}\nUSER root\n"
+            + setup
+            + f"RUN groupadd -g {p['uid']} {p['user']} && useradd -u {p['uid']} -g {p['uid']} -M -s /bin/bash {p['user']}\n"
+            "COPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
+            'COPY research.sh /etc/profile.d/research.sh\nENTRYPOINT ["/usr/local/sbin/research-entrypoint"]\nCMD []\n'
+        )
+        image = run(
+            "docker",
+            "build",
+            "-q",
+            "--memory=4g",
+            "--cpu-quota=200000",
+            "--network=" + ("default" if official else "none"),
+            str(stage),
+            timeout=1800 if official else 300,
+        )
+        run(
+            "docker",
+            "run",
+            "--rm",
+            "--network=none",
+            "--entrypoint",
+            "/bin/sh",
+            image,
+            "-c",
+            "test -x /usr/sbin/sshd && test -x /usr/local/sbin/research-entrypoint && python3 --version",
+            timeout=30,
+        )
         shadow = run(
             "docker",
             "run",
@@ -489,7 +595,7 @@ def worker(p, job):
             disk=str(disk),
             prefix="lh-" + p["id"] + "-",
             managed=True,
-            source_image=p["source_image"],
+            source_image=official or p["source_image"],
             sandbox=False,
         )
         # Recovery starts only this existing container after checking its mount; never recreates it.
@@ -532,6 +638,29 @@ def worker(p, job):
         c["labs"][p["id"]] = spec
         c["write_labs"].append(p["id"])
         hotops.save(hotops.ETC / "policy.json", c)
+        info = run(
+            "docker",
+            "exec",
+            name,
+            "/bin/sh",
+            "-c",
+            "python3 --version; if test -x /opt/conda/bin/conda; then /opt/conda/bin/conda --version; fi",
+            timeout=20,
+        )
+        web_path = hotops.ETC / "web.json"
+        if web_path.exists():
+            config = json.loads(web_path.read_text())
+            profile = config.setdefault("document_labs", {}).setdefault(p["id"], {})
+            description = (official or p.get("source_label") or source) + "\n" + info
+            profile.update(
+                schema_version=1, environment_ko=description, environment_en=description
+            )
+            meta = web_path.stat()
+            temp = web_path.with_suffix(".next")
+            temp.write_text(json.dumps(config, ensure_ascii=False, indent=2))
+            os.chmod(temp, meta.st_mode & 0o777)
+            os.chown(temp, meta.st_uid, meta.st_gid)
+            temp.replace(web_path)
         if old:
             progress("Removing the approved test environment")
             retire(p, c, old, stage)
@@ -643,6 +772,20 @@ def prepare(req):
     options = {
         hotops.name(s, u): (s, u) for s in c["labs"].values() for u in s["users"]
     }
+    official = None
+    official_id = None
+    if req.get("image_mode", "registered") == "official":
+        official = __import__("environments").reference(
+            req.get("image_provider"), req.get("image_tag")
+        )
+        try:
+            official_id = hotops.obj(official)["Id"]
+        except subprocess.CalledProcessError:
+            pass
+        if not req.get("source_container"):
+            req = dict(req, source_container=next(iter(options), ""))
+    elif req.get("image_mode", "registered") != "registered":
+        raise ValueError("Invalid image source")
     if req.get("source_container") not in options:
         raise ValueError("기준 개발환경을 선택하세요.")
     source = hotops.obj(req["source_container"])
@@ -711,6 +854,11 @@ def prepare(req):
         storage_name=req.get("storage_name") or key,
         source_image=image,
         source_image_id=image,
+        official_image=official,
+        official_image_id=official_id,
+        source_label=official or image,
+        image_provider=req.get("image_provider") if official else None,
+        image_tag=req.get("image_tag") if official else None,
         password_hash=crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512)),
         profile=profile,
         replace=None,

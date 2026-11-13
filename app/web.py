@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.6.4")
+    return jsonify(status="ok", version="0.6.5")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -295,6 +295,7 @@ def provision_page():
         changes=call({"action": "provision_plans"}),
         data=data,
         default_gpu=default_gpu,
+        environment_templates=call({"action": "provision_sources"}),
     )
 
 
@@ -306,6 +307,9 @@ def provision_prepare():
         "new_user",
         "password",
         "source_container",
+        "image_mode",
+        "image_provider",
+        "image_tag",
         "gpu_index",
         "storage_gb",
         "storage_name",

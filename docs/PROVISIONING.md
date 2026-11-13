@@ -39,3 +39,11 @@ validation before being claimed as tested.
 An optional `storage_name` defaults to the lab ID. The creation form can override it with 2–32 lowercase letters, digits, hyphens or underscores, beginning with a letter. Both folder and `.ext4` filename are checked for collisions, including dangling symlinks, before submission and again before allocation. Lab identity and container naming remain separate from the storage folder.
 
 Existing lab storage paths and backing files are visible on the storage page, but are not editable. This feature does not rename live mounts, relocate data or recreate existing containers.
+
+### Official base images
+
+The default creation flow selects NVIDIA CUDA (Docker Hub) or NVIDIA PyTorch (NGC), followed by an official tag. A local official image whose layers are a prefix of a registered laboratory image is offered as a current base preset. This is layer ancestry evidence, not a promise that the original image tag was recorded at creation time.
+
+Advanced image reuse is collapsed by default. It reuses a registered image, not its mounted files or current writable container changes. Use backup/recovery controls for those operations. No image upload is provided.
+
+Official creation adds SSH and Python utilities and requires package registry access during image build. CUDA bases do not automatically contain Conda or PyTorch. Compatibility of every upstream tag is not asserted. Plans capture a locally available immutable image ID; absent images are downloaded only when the administrator applies the plan.

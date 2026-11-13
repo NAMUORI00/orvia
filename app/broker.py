@@ -316,6 +316,8 @@ class Handler(socketserver.StreamRequestHandler):
                     result = __import__("telemetry").read(
                         req.get("hours", 2), req.get("start"), req.get("end")
                     )
+                elif req.get("action") == "provision_sources":
+                    result = __import__("lifecycle").sources()
                 elif req.get("action") == "telemetry_retention":
                     result = __import__("telemetry").retention(req.get("values"))
                 elif req.get("action") == "storage_usage":
@@ -365,6 +367,7 @@ class Handler(socketserver.StreamRequestHandler):
             if req.get("action") not in {
                 "status",
                 "catalog",
+                "provision_sources",
                 "telemetry",
                 "storage_usage",
                 "files",
@@ -375,6 +378,7 @@ class Handler(socketserver.StreamRequestHandler):
             if req.get("action") not in {
                 "status",
                 "catalog",
+                "provision_sources",
                 "telemetry",
                 "storage_usage",
                 "files",

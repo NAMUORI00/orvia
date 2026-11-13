@@ -81,3 +81,10 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Browser checks cover laboratory/account selection, access-sheet cards, permission preset presentation and activity records. Template syntax is checked alongside the Python suite after a template formatting defect was found and repaired.
 
 - Final verification: 78 Linux tests passed; Korean and English access-sheet PDF generation succeeded using live configured data. No production permission changes, new researcher containers or environment replacement were executed.
+
+## 0.6.5 official image selection and creation wizard
+
+- Creation separates laboratory/image, resource allocation and first account. GPU cards support click, keyboard and drag/drop; storage uses presets, slider and numeric input.
+- Official NVIDIA CUDA and NGC PyTorch catalogs are the default. Locally available official layer prefixes identify the bases used by existing laboratories; all four current image families matched nvidia/cuda:12.4.1-base-ubuntu22.04. Customized laboratory image reuse is collapsed under advanced controls.
+- Official creation validates the provider reference, pins an available image ID, and adds SSH/Python tools. Conda and additional libraries are not implied by a CUDA base. Live image catalog and wizard selection were checked; 80 Linux unit tests passed. Full creation from a new official base was not executed.
+- Deployment restarts dashboard services only; existing researcher containers are protected.
