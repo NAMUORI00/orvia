@@ -71,3 +71,13 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - At most four closed buckets are archived per collection cycle. Unarchived samples are protected from pruning; a predecessor is retained for counter boundaries. SQLite freed pages are reused without full VACUUM.
 - 71 Linux tests passed, including bounded backfill, expiry, average/max preservation, archive/raw network totals, date filtering and settings bounds. Browser verification covered empty dates and saving default retention.
 - Current small-dataset read measurements were 0.8–4.7 ms with approximately 19 MiB peak RSS for the standalone read process. These are not a 90-day production benchmark. Existing research containers are unchanged by dashboard deployment.
+
+## 0.6.4 laboratory hierarchy, permission profiles and visual management
+
+- Monitoring separates whole-server trends, laboratory resource cards and the selected laboratory's accounts. CPU/memory account totals remain distinct from host-wide utilization. GPU utilization and VRAM remain shared laboratory metrics; per-account GPU usage is explicitly uncollected. Historical samples without allocation metadata remain N/A.
+- Access-sheet laboratory selection uses visual cards. Permission text derives from structured policy and container isolation flags rather than saved prose. Writable root filesystems no longer imply sudo. Profile changes use the existing environment replacement workflow and its downtime/recreation confirmations; this release does not introduce live sudo toggling.
+- Versioned JSON profiles offer standard user and container administrator roles, both without host Docker delegation. New accounts in a container-admin laboratory receive their own sudo rule. Tests validate policy selection, conflicting runtime constraints, inheritance directives and document text; production researcher permissions are not changed during testing.
+- Activity cards distinguish accepted asynchronous requests from job outcomes. Read-only events are folded separately, action identifiers remain available, and the audit tail is bounded to 256 KiB / 100 events.
+- Browser checks cover laboratory/account selection, access-sheet cards, permission preset presentation and activity records. Template syntax is checked alongside the Python suite after a template formatting defect was found and repaired.
+
+- Final verification: 78 Linux tests passed; Korean and English access-sheet PDF generation succeeded using live configured data. No production permission changes, new researcher containers or environment replacement were executed.

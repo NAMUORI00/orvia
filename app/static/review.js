@@ -44,7 +44,21 @@
                     ? " GB"
                     : ""),
           );
-      if (fields.getAll('gpu_selection').length) add('배정 GPU', fields.getAll('gpu_selection').map(v=>'GPU '+v).join(', '));
+      if (fields.getAll("gpu_selection").length)
+        add(
+          "배정 GPU",
+          fields
+            .getAll("gpu_selection")
+            .map((v) => "GPU " + v)
+            .join(", "),
+        );
+      if (fields.get("permission_profile"))
+        add(
+          "권한 프로필",
+          fields.get("permission_profile") === "container_admin"
+            ? "컨테이너 관리자"
+            : "표준 사용자",
+        );
       if (form.dataset.current) add("현재 설정", form.dataset.current);
       dialog.append(list, node("p", form.dataset.review));
       const buttons = document.createElement("div");

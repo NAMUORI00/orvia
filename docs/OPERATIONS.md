@@ -45,3 +45,7 @@ Recreation pins the current image digest and preserves the inspected configurati
 The deployment allowlists authorize normal administrator operations. Test restrictions belong to the verification procedure, not production feature flags. Authorize each registered laboratory and the intended GPU UUIDs in policy.json. Authentication, target confirmation, current-state checks, persistent mount validation and rollback remain enforced. Never test mutations against active research workloads.
 
 GPU and image operations pause the recovery timer, retain original containers and replace only the selected laboratory. The installed recovery manifest subsequently starts existing stopped containers after mount validation; it does not recreate missing containers. It also restarts intentionally stopped containers while the timer is enabled.
+
+## Permission profiles
+
+`app/permission_profiles.json` is the versioned capability catalogue. The environment replacement form submits a profile ID; the broker validates it and applies container sudo through the existing guarded image preparation/recreation path. Host Docker access is not a selectable capability. Access sheets derive their permission row from policy plus inspected isolation flags, not editable free-text defaults. Policy inspection is not a probe of manually modified in-container sudoers files. Existing system packages are replaced in this workflow, so permission-only live editing is not claimed.

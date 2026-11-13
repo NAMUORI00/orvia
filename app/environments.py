@@ -17,6 +17,8 @@ def reference(provider, tag):
 
 
 def submit(req):
+    key, profile = __import__("permissions").requested(req)
+    req = dict(req, root_access="yes" if profile["container_sudo"] else "no")
     c, s, u, o = hotops.authorize(req)
     source = reference(req.get("image_provider"), req.get("image_tag"))
     if (

@@ -166,10 +166,18 @@ def snapshot():
         )
     events = []
     if (STATE / "audit.jsonl").exists():
-        events = [
-            json.loads(x)
-            for x in (STATE / "audit.jsonl").read_text().splitlines()[-15:]
-        ][::-1]
+        with (STATE / "audit.jsonl").open("rb") as stream:
+            stream.seek(0, 2)
+            offset = max(0, stream.tell() - 262144)
+            stream.seek(offset)
+            if offset:
+                stream.readline()
+            lines = stream.read().decode("utf-8", errors="replace").splitlines()
+        for line in reversed(lines[-100:]):
+            try:
+                events.append(json.loads(line))
+            except ValueError:
+                continue
     mem = {
         l.split(":")[0]: int(l.split()[1])
         for l in pathlib.Path("/proc/meminfo").read_text().splitlines()

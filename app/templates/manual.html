@@ -1,6 +1,87 @@
 {% extends 'base.html' %}{% block content %}
-<section class="page-head"><div><p class="eyebrow">DOCUMENTS</p><h1>이용 안내서</h1><p>연구실 설정을 기준으로 접속 안내서를 생성합니다.</p></div></section>
-<section class="card card-pad"><form method="get" action="/manual"><label for="manual-lab">연구실 선택</label><select id="manual-lab" name="lab">{% for item in data.labs %}<option value="{{item.id}}" {% if item.id==lab.id %}selected{% endif %}>{{item.title}}</option>{% endfor %}</select><button>안내서 미리보기</button></form></section>
-<section class="card card-pad"><h2>{{document.title}}</h2><dl class="storage-location"><dt>접속 주소</dt><dd>{{document.host}}</dd></dl><div class="scroll"><table><thead><tr><th>계정 ID</th><th>사용자명</th><th>SSH 포트</th><th>접속 명령</th></tr></thead><tbody>{% for u in document.accounts %}<tr><td>{{u.id}}</td><td>{{u.display_name}}</td><td>{{u.port}}</td><td><code>{{u.command}}</code></td></tr>{% else %}<tr><td colspan="4">N/A</td></tr>{% endfor %}</tbody></table></div><table><tbody>{% for r in document.resources %}<tr><th>{{r.label}}</th><td class="document-value">{{r.value}}</td></tr>{% endfor %}</tbody></table><p class="muted">등록되지 않은 항목은 N/A로 표시합니다.</p></section>
-<form method="post" action="/manual/pdf" class="card card-pad" id="manual-form"><input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="lab" value="{{lab.id}}"><label for="document-language">문서 언어</label><select id="document-language" name="document_language"><option value="ko">한국어</option><option value="en" {% if locale=='en' %}selected{% endif %}>English</option></select><label for="note">추가 안내 (선택)</label><textarea id="note" name="note" rows="3" maxlength="600"></textarea><button type="submit">PDF 다운로드</button></form>
+<section class="page-head">
+  <div>
+    <p class="eyebrow">DOCUMENTS</p>
+    <h1>이용 안내서</h1>
+    <p>연구실 설정을 기준으로 접속 안내서를 생성합니다.</p>
+  </div>
+</section>
+<section class="manual-lab-grid" aria-label="연구실 선택">
+  {% for item in data.labs %}<a
+    class="manual-lab-card {{'selected' if item.id==lab.id else ''}}"
+    href="/manual?lab={{item.id}}"
+    aria-current="{{'true' if item.id==lab.id else 'false'}}"
+  >
+    <div class="manual-lab-art">
+      <img src="/static/models/laboratory.svg" alt="" /><span
+        >{{'선택됨' if item.id==lab.id else '안내서 미리보기'}} ›</span
+      >
+    </div>
+    <h2>{{item.title}}</h2>
+    <div class="manual-resource-tags">
+      <span>♙ {{item.users|length}} · 사용자</span
+      ><span>▥ {{(item.gpu_indices or [item.gpu])|length}} · GPU</span
+      ><span>▤ {{item.storage_gb}} GB</span>
+    </div> </a
+  >{% endfor %}
+</section>
+<section class="card card-pad">
+  <h2>{{document.title}}</h2>
+  <dl class="storage-location">
+    <dt>접속 주소</dt>
+    <dd>{{document.host}}</dd>
+  </dl>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>계정 ID</th>
+          <th>사용자명</th>
+          <th>SSH 포트</th>
+          <th>접속 명령</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in document.accounts %}
+        <tr>
+          <td>{{u.id}}</td>
+          <td>{{u.display_name}}</td>
+          <td>{{u.port}}</td>
+          <td><code>{{u.command}}</code></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">N/A</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <table>
+    <tbody>
+      {% for r in document.resources %}
+      <tr>
+        <th>{{r.label}}</th>
+        <td class="document-value">{{r.value}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted">등록되지 않은 항목은 N/A로 표시합니다.</p>
+</section>
+<form method="post" action="/manual/pdf" class="card card-pad" id="manual-form">
+  <input type="hidden" name="csrf" value="{{session.csrf}}" /><input
+    type="hidden"
+    name="lab"
+    value="{{lab.id}}"
+  /><label for="document-language">문서 언어</label
+  ><select id="document-language" name="document_language">
+    <option value="ko">한국어</option>
+    <option value="en" {% if locale=='en' %}selected{% endif %}>
+      English
+    </option></select
+  ><label for="note">추가 안내 (선택)</label
+  ><textarea id="note" name="note" rows="3" maxlength="600"></textarea
+  ><button type="submit">PDF 다운로드</button>
+</form>
 {% endblock %}

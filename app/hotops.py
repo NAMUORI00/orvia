@@ -82,7 +82,8 @@ def catalog():
                     readonly=h.get("ReadonlyRootfs", False),
                     id=o["Id"][:12],
                     started=o["State"]["StartedAt"],
-                    root_access=not h.get("ReadonlyRootfs", False),
+                    root_access=bool(u.get("root_access", s.get("root_access", False))),
+                    permissions=__import__("permissions").describe(s, u, o),
                 )
             )
         result.append(

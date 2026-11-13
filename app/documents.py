@@ -1,6 +1,7 @@
 """Version 1 access-sheet data contract. No credentials or request-supplied specs."""
 
 import re
+import permissions
 
 SCHEMA_VERSION = 1
 NA = "N/A"
@@ -71,7 +72,7 @@ def compose(settings, data, lab, accounts, lang="ko", note=""):
         dict(
             id="permissions",
             label=tr("권한 범위", "Permissions"),
-            value=value(profile.get("permissions_" + lang)),
+            value=account_values([permissions.text(u.get("permissions"), lang) for u in accounts]),
         ),
     ]
     extras = profile.get("extra_fields", [])

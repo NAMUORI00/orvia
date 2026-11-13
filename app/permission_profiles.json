@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "standard": {
+      "label_ko": "표준 사용자",
+      "label_en": "Standard user",
+      "container_sudo": false,
+      "workspace_packages": true,
+      "host_docker": false,
+      "description_ko": "사용자 작업공간의 패키지 설치 · sudo 미제공"
+    },
+    "container_admin": {
+      "label_ko": "컨테이너 관리자",
+      "label_en": "Container administrator",
+      "container_sudo": true,
+      "workspace_packages": true,
+      "host_docker": false,
+      "description_ko": "컨테이너 내부 sudo · 시스템 패키지 설치"
+    }
+  }
+}

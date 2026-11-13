@@ -105,6 +105,9 @@ def worker(lab, name, password_hash, profile, source, job):
         )
         (stage / "Dockerfile").write_text(
             f"FROM {hotops.build_source(source['Image'])}\nRUN groupadd -g {uid} {name} && useradd -u {uid} -g {uid} -M -s /bin/bash {name}\nCOPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
+            + __import__("permissions").account_sudo_rule(
+                name, bool(s.get("root_access", False))
+            )
         )
         image = hotops.run(
             "docker", "build", "-q", "--network=none", str(stage), timeout=300

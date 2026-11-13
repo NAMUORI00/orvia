@@ -28,21 +28,28 @@
   <span id="monitor-time">수집 대기</span
   ><span>그래프에 마우스를 올리거나 터치하면 수치를 확인할 수 있습니다.</span>
 </div>
+<h2>전체 서버</h2>
 <div id="monitor-overview" class="overview-metrics"></div>
-<section class="card card-pad network-overview">
+<section class="card card-pad lab-resource-section">
   <div class="usage-heading">
-    <h2>네트워크 사용량</h2>
-    <span class="muted">기간 누적 · 사용자 선택</span>
+    <h2>연구실별 자원</h2>
+    <span class="muted">연구실 선택 · 사용자별 사용량</span>
   </div>
+  <div id="monitor-labs" class="lab-resource-grid"></div>
+</section>
+<section id="lab-users-panel" class="card card-pad" hidden>
+  <div class="usage-heading">
+    <h2 id="lab-users-title"></h2>
+    <button id="lab-users-close" type="button" class="secondary">접기</button>
+  </div>
+  <p class="muted">
+    CPU·메모리는 계정 환경 기준이며 GPU·저장공간은 연구실 공동 자원입니다.
+  </p>
+  <h3>사용자별 자원</h3>
+  <div id="monitor-users" class="account-map"></div>
+  <h3>네트워크 사용량</h3>
   <div class="network-legend"><span>● 수신</span><span>● 송신</span></div>
   <div id="network-ranking" class="network-ranking"></div>
-</section>
-<section class="card card-pad account-overview">
-  <div class="usage-heading">
-    <h2>사용자 활동</h2>
-    <span class="muted">사용자 선택 · 상세 지표</span>
-  </div>
-  <div id="monitor-users" class="account-map"></div>
 </section>
 <div class="monitor-actions">
   <button id="monitor-hardware-open" class="secondary" type="button">

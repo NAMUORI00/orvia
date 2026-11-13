@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.6.3")
+    return jsonify(status="ok", version="0.6.4")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -254,7 +254,14 @@ def lab_page(lab_id, section="overview"):
 
 @app.get("/activity")
 def activity_page():
-    return render_template("activity.html", data=call({"action": "status"}))
+    data = call({"action": "status"})
+    catalog = call({"action": "catalog"})
+    return render_template(
+        "activity.html",
+        data=data,
+        records=__import__("activity_view").events(data),
+        jobs=catalog.get("jobs", [])[:10],
+    )
 
 
 @app.route("/provision", methods=["GET", "POST"])
@@ -366,6 +373,7 @@ def hot_action():
         "image_provider",
         "image_tag",
         "root_access",
+        "permission_profile",
         "storage",
         "gpu_selection",
     ]
@@ -450,10 +458,11 @@ def language_options():
     from i18n import TRANSLATIONS
 
     return {
+        "permission_profiles": __import__("permissions").CATALOG["profiles"],
         "languages": {
             code: phrases.get("_language_name", code)
             for code, phrases in TRANSLATIONS.items()
-        }
+        },
     }
 
 

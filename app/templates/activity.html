@@ -1,1 +1,64 @@
-{% extends 'base.html' %}{% block content %}<h1>작업 기록</h1><section class="card" id="activity"><div class="scroll"><table><thead><tr><th>시각</th><th>연구실</th><th>대상</th><th>작업</th><th>결과</th></tr></thead><tbody>{% for e in data.events %}<tr><td>{{e.time}}</td><td>{{e.lab}}</td><td>{{e.user or '전체'}}</td><td>{{e.action}}</td><td>{{e.result}}</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends 'base.html' %}{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">ACTIVITY</p>
+    <h1>작업 기록</h1>
+    <p>작업 종류 · 대상 · 처리 결과</p>
+  </div>
+</section>
+{% if jobs %}
+<section class="card card-pad">
+  <h2>실행 작업</h2>
+  <div class="activity-jobs">
+    {% for j in jobs %}
+    <article class="job-card">
+      <span class="activity-icon" aria-hidden="true"
+        >{{'↻' if j.state in ['running','queued'] else '✓' if
+        j.state=='complete' else '!'}}</span
+      >
+      <div>
+        <strong
+          >{{
+          (data.labs|selectattr('id','equalto',j.lab)|map(attribute='title')|list|first)
+          or j.lab }}</strong
+        >
+        <p>{{j.message}}</p>
+        <small>{{j.time}}</small>
+      </div>
+      <span class="badge"
+        >{{'진행 중' if j.state=='running' else '대기' if j.state=='queued' else
+        '완료' if j.state=='complete' else '실패' if j.state=='failed' else
+        '확인 필요'}}</span
+      >
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<section class="card card-pad">
+  <h2>최근 관리 기록</h2>
+  <div class="activity-timeline">
+    {% for e in records if not e.read %}
+    <details class="activity-entry {{e.state}}">
+      <summary>
+        <span class="activity-icon" aria-hidden="true">{{e.icon}}</span
+        ><span class="activity-main"
+          ><strong>{{e.label}}</strong><span>{{e.lab}} · {{e.user}}</span></span
+        ><span class="activity-result">{{e.label_result}}</span
+        ><time>{{e.time}}</time>
+      </summary>
+      <dl>
+        <dt>작업 식별자</dt>
+        <dd><code>{{e.code}}</code></dd>
+        <dt>대상 연구실</dt>
+        <dd>{{e.lab}}</dd>
+        <dt>대상 사용자</dt>
+        <dd>{{e.user}}</dd>
+      </dl>
+    </details>
+    {% else %}
+    <p>기록 없음</p>
+    {% endfor %}
+  </div>
+</section>
+<details class="card card-pad"><summary>조회 기록</summary>{% for e in records if e.read %}<p>{{e.icon}} {{e.label}} · {{e.lab}} · {{e.time}}</p>{% else %}<p>기록 없음</p>{% endfor %}</details>{% endblock %}

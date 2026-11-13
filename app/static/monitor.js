@@ -18,6 +18,7 @@
           ? (n / 1e6).toFixed(1) + " MB"
           : (n / 1024).toFixed(1) + " KiB";
   const colors = ["#218878", "#5b88bd", "#9872b4", "#cb984d"];
+  let selectedLab = null;
   let data,
     timer,
     selected = null,
@@ -51,11 +52,162 @@
         .map((g) => "GPU " + g.index + " · " + t("온도 확인")),
     ];
   }
+  function memoryBytes(value) {
+    const m = /^\s*([\d.]+)\s*(B|KiB|MiB|GiB|TiB|kB|MB|GB|TB)/.exec(
+      value || "",
+    );
+    return m
+      ? Number(m[1]) *
+          {
+            B: 1,
+            KiB: 1024,
+            MiB: 1024 ** 2,
+            GiB: 1024 ** 3,
+            TiB: 1024 ** 4,
+            kB: 1000,
+            MB: 1e6,
+            GB: 1e9,
+            TB: 1e12,
+          }[m[2]]
+      : null;
+  }
+  function sumKnown(values) {
+    return values.length && values.every((v) => v != null && Number.isFinite(v))
+      ? values.reduce((a, b) => a + b, 0)
+      : null;
+  }
+  function meter(parent, label, value, max, format, extra = "") {
+    const box = node("div", "", "resource-meter");
+    box.append(node("span", t(label)));
+    const bar = document.createElement("progress");
+    bar.max = max > 0 ? max : 1;
+    bar.value = value == null || !(max > 0) ? 0 : value;
+    bar.tabIndex = 0;
+    bar.setAttribute("aria-label", t(label));
+    const text =
+      t(label) +
+      " · " +
+      (value == null ? "N/A" : format(value)) +
+      (max > 0 ? " / " + format(max) : "") +
+      (extra ? "\n" + extra : "");
+    V.hint(bar, text);
+    bar.onclick = () => V.show(text, bar);
+    box.append(bar);
+    if (value == null || !(max > 0)) box.append(node("small", "N/A"));
+    parent.append(box);
+  }
+  function renderLabs() {
+    const d = data.latest,
+      grid = el("monitor-labs");
+    grid.replaceChildren();
+    if (!d.disks.some((s) => s.lab === selectedLab)) selectedLab = null;
+    const network = data.network_usage || [];
+    const trafficMax = Math.max(
+      1,
+      ...d.disks.map((s) =>
+        network
+          .filter((a) => a.lab === s.lab)
+          .reduce((n, a) => n + a.rx + a.tx, 0),
+      ),
+    );
+    d.disks.forEach((s) => {
+      const card = node("article", "", "lab-resource-card");
+      card.classList.toggle("selected", s.lab === selectedLab);
+      const select = node("button", s.title + " ›", "lab-resource-select");
+      select.setAttribute("aria-pressed", String(s.lab === selectedLab));
+      select.onclick = () => {
+        selectedLab = s.lab;
+        render();
+      };
+      card.append(select);
+      const accounts = d.accounts.filter((a) => a.lab === s.lab);
+      card.append(
+        node(
+          "small",
+          t("사용자") +
+            " " +
+            accounts.length +
+            " · " +
+            t("실행 중") +
+            " " +
+            accounts.filter((a) => a.running).length,
+        ),
+      );
+      meter(
+        card,
+        "CPU",
+        sumKnown(
+          accounts.map((a) =>
+            a.running ? (a.cpu == null ? null : a.cpu / 100) : 0,
+          ),
+        ),
+        d.cpu_count,
+        (v) => v.toFixed(1) + " " + t("코어"),
+      );
+      meter(
+        card,
+        "메모리",
+        sumKnown(accounts.map((a) => (a.running ? memoryBytes(a.memory) : 0))),
+        d.memory_total,
+        size,
+      );
+      const gpus = d.gpus.filter((g) =>
+        (s.gpu_indices || []).includes(g.index),
+      );
+      meter(
+        card,
+        "GPU",
+        gpus.length && gpus.every((g) => g.util != null)
+          ? sumKnown(gpus.map((g) => g.util)) / gpus.length
+          : null,
+        100,
+        (v) => v.toFixed(1) + "%",
+        t("연구실 공동 사용"),
+      );
+      meter(
+        card,
+        "GPU 메모리",
+        sumKnown(gpus.map((g) => (g.used == null ? null : g.used * 1048576))),
+        sumKnown(gpus.map((g) => (g.total == null ? null : g.total * 1048576))),
+        size,
+        t("연구실 공동 사용"),
+      );
+      meter(card, "공유 저장공간", s.used, s.capacity, size);
+      const net = network.filter((a) => a.lab === s.lab);
+      meter(
+        card,
+        "기간 전송량",
+        net.some((a) => a.seconds)
+          ? net.reduce((n, a) => n + a.rx + a.tx, 0)
+          : null,
+        trafficMax,
+        size,
+        t("연구실 간 상대 비교"),
+      );
+      grid.append(card);
+    });
+    const storage = node("section", "", "metric-card");
+    storage.append(node("h3", t("공유 저장공간 합계")));
+    meter(
+      storage,
+      "사용량",
+      sumKnown(d.disks.map((s) => s.used)),
+      sumKnown(d.disks.map((s) => s.capacity)),
+      size,
+    );
+    el("monitor-overview").append(storage);
+    el("lab-users-panel").hidden = !selectedLab;
+    el("lab-users-title").textContent =
+      d.disks.find((s) => s.lab === selectedLab)?.title || "";
+  }
   function render() {
     if (!data?.latest) {
-      ["monitor-overview", "monitor-users", "network-ranking"].forEach((id) =>
-        el(id).replaceChildren(),
-      );
+      [
+        "monitor-overview",
+        "monitor-labs",
+        "monitor-users",
+        "network-ranking",
+      ].forEach((id) => el(id).replaceChildren());
       el("monitor-health").textContent = t("기록 없음");
       el("monitor-time").textContent = "—";
       el("monitor-error").textContent = t("선택한 기간에 기록이 없습니다.");
@@ -122,7 +274,7 @@
         values: h.map((p) => ({ ts: p.ts, value: p.memory / 1073741824 })),
       },
       {
-        name: "네트워크",
+        name: "연구 환경 네트워크",
         key: "network",
         color: colors[3],
         format: (v) => size(v) + "/s",
@@ -150,50 +302,72 @@
       card.append(foot);
       overview.append(card);
     });
+    renderLabs();
     const users = el("monitor-users");
     users.replaceChildren();
-    d.accounts.forEach((a) => {
-      const card = node("article", "", "account-tile");
-      const button = node("button", "", "account-select");
-      button.type = "button";
-      const status = node(
-        "span",
-        "",
-        "presence " + (a.running ? "online" : "offline"),
-      );
-      status.setAttribute("aria-label", t(a.running ? "실행 중" : "정지"));
-      button.append(
-        status,
-        node("strong", a.user),
-        node("span", "›", "account-arrow"),
-      );
-      button.onclick = () => open("account", a.user);
-      card.append(button);
-      const p = h.map((row) => ({
-        ts: row.ts,
-        value:
-          row.accounts.find((u) => u.user === a.user)?.cpu == null
-            ? null
-            : row.accounts.find((u) => u.user === a.user).cpu / 100,
-      }));
-      series(
-        card,
-        a.user + " · CPU",
-        p,
-        (v) => v.toFixed(2) + " " + t("코어"),
-        a.running ? colors[0] : "#9cabb3",
-      );
-      card.append(
-        node("span", t(a.running ? "실행 중" : "정지"), "metric-caption"),
-      );
-      users.append(card);
-    });
-    renderNetwork(el("network-ranking"));
+    d.accounts
+      .filter((a) => a.lab === selectedLab)
+      .forEach((a) => {
+        const card = node("article", "", "account-tile");
+        const button = node("button", "", "account-select");
+        button.type = "button";
+        const status = node(
+          "span",
+          "",
+          "presence " + (a.running ? "online" : "offline"),
+        );
+        status.setAttribute("aria-label", t(a.running ? "실행 중" : "정지"));
+        button.append(
+          status,
+          node("strong", a.user),
+          node("span", "›", "account-arrow"),
+        );
+        button.onclick = () => open("account", a.lab + "/" + a.user);
+        card.append(button);
+        const p = h.map((row) => ({
+          ts: row.ts,
+          value:
+            row.accounts.find((u) => u.user === a.user && u.lab === a.lab)
+              ?.cpu == null
+              ? null
+              : row.accounts.find((u) => u.user === a.user && u.lab === a.lab)
+                  .cpu / 100,
+        }));
+        series(
+          card,
+          a.user + " · CPU",
+          p,
+          (v) => v.toFixed(2) + " " + t("코어"),
+          a.running ? colors[0] : "#9cabb3",
+          d.cpu_count,
+        );
+        card.append(node("span", t("CPU 사용 추이"), "metric-caption"));
+        meter(card, "메모리", memoryBytes(a.memory), d.memory_total, size);
+        const rates = a.rates;
+        const traffic = node("button", t("네트워크 상세"), "secondary");
+        V.hint(
+          traffic,
+          t("수신") +
+            " " +
+            size(rates?.rx) +
+            "/s · " +
+            t("송신") +
+            " " +
+            size(rates?.tx) +
+            "/s",
+        );
+        traffic.onclick = () => open("network-account", a.lab + "/" + a.user);
+        card.append(traffic);
+        users.append(card);
+      });
+    renderNetwork(el("network-ranking"), selectedLab);
     if (el("monitor-detail").open) renderDetail();
   }
-  function renderNetwork(target) {
+  function renderNetwork(target, lab = null) {
     target.replaceChildren();
-    const usage = data.network_usage || [];
+    const usage = (data.network_usage || []).filter(
+      (a) => lab === null || a.lab === lab,
+    );
     const max = Math.max(1, ...usage.map((a) => a.rx + a.tx));
     usage.forEach((a) => {
       const button = node("button", "", "network-account");
@@ -336,7 +510,7 @@
       title = a.user + " · " + t("네트워크");
       networkDetail(body, a);
     } else if (dialogKind === "account") {
-      const a = d.accounts.find((a) => a.user === selected);
+      const a = d.accounts.find((a) => a.lab + "/" + a.user === selected);
       if (!a) return;
       title = a.user;
       const list = node("dl", "", "detail-values");
@@ -347,6 +521,8 @@
         a.cpu == null ? "N/A" : (a.cpu / 100).toFixed(2) + " " + t("코어"),
       );
       row(list, "메모리", a.memory || "N/A");
+      row(list, "GPU", t("연구실 공동 사용 · 사용자별 미집계"));
+      row(list, "연구실", d.disks.find((s) => s.lab === a.lab)?.title || a.lab);
       row(
         list,
         "수신 / 송신",
@@ -384,9 +560,11 @@
         data.history.map((p) => ({
           ts: p.ts,
           value:
-            p.accounts.find((u) => u.user === selected)?.cpu == null
+            p.accounts.find((u) => u.lab + "/" + u.user === selected)?.cpu ==
+            null
               ? null
-              : p.accounts.find((u) => u.user === selected).cpu / 100,
+              : p.accounts.find((u) => u.lab + "/" + u.user === selected).cpu /
+                100,
         })),
         (v) => v.toFixed(2) + " " + t("코어"),
         colors[0],
@@ -479,6 +657,10 @@
     el("detail-title").textContent = title;
   }
   el("detail-close").onclick = () => el("monitor-detail").close();
+  el("lab-users-close").onclick = () => {
+    selectedLab = null;
+    render();
+  };
   el("monitor-detail").addEventListener("close", V.hide);
   el("monitor-hardware-open").onclick = () => open("hardware");
   el("monitor-events-open").onclick = () => open("events");

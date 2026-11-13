@@ -185,7 +185,12 @@ def sample(previous=None, processes=None):
             capacity = used = None
         disks.append(
             dict(
-                lab=lab, title=s["title"], mounted=mounted, capacity=capacity, used=used
+                lab=lab,
+                title=s["title"],
+                mounted=mounted,
+                capacity=capacity,
+                used=used,
+                gpu_indices=s.get("indices", [s.get("index")]),
             )
         )
     ticks = [
@@ -219,6 +224,7 @@ def sample(previous=None, processes=None):
         load=os.getloadavg()[0],
         memory_used=mem["MemTotal"] - mem["MemAvailable"],
         memory_total=mem["MemTotal"],
+        cpu_count=os.cpu_count(),
     )
 
 
