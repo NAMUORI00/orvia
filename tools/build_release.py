@@ -38,7 +38,7 @@ def main():
     ).encode()
     manifest = {n: hashlib.sha256(b).hexdigest() for n, b in files.items()}
     files["manifest.json"] = json.dumps(manifest, indent=2).encode()
-    archive = out / ("LabHarbor-" + args.version + ".zip")
+    archive = out / ("Orvia-" + args.version + ".zip")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():
             z.writestr(name, data)

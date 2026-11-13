@@ -1,0 +1,40 @@
+<section id="usage-view" data-lab="{{lab.id}}" class="card card-pad">
+  <div class="usage-heading">
+    <div>
+      <h2>저장공간 분석</h2>
+      <p class="muted">사용자 작업폴더 기준 · 디스크 점유량</p>
+    </div>
+    <span id="usage-time">집계 대기</span>
+  </div>
+  <div class="usage-summary">
+    <div><span>전체 용량</span><strong id="usage-capacity">—</strong></div>
+    <div><span>사용량</span><strong id="usage-used">—</strong></div>
+    <div><span>여유 공간</span><strong id="usage-free">—</strong></div>
+  </div>
+  <svg
+    id="usage-allocation"
+    viewBox="0 0 1000 48"
+    preserveAspectRatio="none"
+    role="img"
+    aria-label="사용자별 저장공간 점유율"
+  ></svg>
+  <div id="usage-accounts" class="usage-accounts"></div>
+  <div class="usage-heading">
+    <h3 id="usage-path">서버 저장 경로</h3>
+    <button type="button" id="usage-up" class="secondary">상위 폴더 ↑</button>
+  </div>
+  <code id="usage-host" class="host-storage-path">{{lab.storage_path}}</code>
+  <div id="usage-paths" class="usage-paths"></div>
+  <p id="usage-state" role="status">
+    집계 중에는 다른 화면을 이용할 수 있습니다.
+  </p>
+  <details>
+    <summary>집계 기준</summary>
+    <p class="muted">
+      파일 내용은 읽지 않습니다. 기본 15분 간격으로 갱신하며, 변경 중인
+      파일·관리 영역·파일시스템 정보로 전체 사용량과 차이가 날 수 있습니다. 숨김
+      캐시를 포함하며 심볼릭 링크는 따라가지 않습니다.
+    </p>
+  </details>
+</section>
+<script defer src="/static/storage-usage.js"></script>

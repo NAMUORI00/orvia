@@ -107,13 +107,13 @@ def make_pdf(document):
         topMargin=44,
         bottomMargin=42,
         title=tr("연구실 접속 안내서", "Laboratory access guide"),
-        author="LabHarbor",
+        author="Orvia",
     )
 
     def footer(c, d):
         c.setFont("Nanum", 8)
         c.setFillColor(colors.HexColor("#728a95"))
-        c.drawString(50, 23, "LabHarbor")
+        c.drawString(50, 23, "Orvia")
         c.drawRightString(A4[0] - 50, 23, str(d.page))
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)

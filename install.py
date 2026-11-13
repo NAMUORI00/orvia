@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LabHarbor installer: installs only its own services; never creates research containers."""
+"""Orvia installer: installs only its own services; never creates research containers."""
 
 import argparse, getpass, hashlib, ipaddress, json, os, pathlib, platform, pwd, re, secrets, shutil, socket, subprocess, sys, time
 
@@ -44,7 +44,7 @@ def preflight():
 
 def units(host, port):
     broker = """[Unit]
-Description=LabHarbor control broker
+Description=Orvia control broker
 After=docker.service
 [Service]
 ExecStart=/usr/bin/python3 /opt/h200-console/app/broker.py
@@ -61,7 +61,7 @@ ProtectSystem=full
 WantedBy=multi-user.target
 """
     web = f"""[Unit]
-Description=LabHarbor web
+Description=Orvia web
 After=h200-console-broker.service
 Requires=h200-console-broker.service
 [Service]
@@ -127,7 +127,7 @@ def install():
         raise SystemExit(
             "Existing installation detected. Use: sudo python3 install.py --update"
         )
-    print("\nLabHarbor setup — research containers stay unchanged\n")
+    print("\nOrvia setup — research containers stay unchanged\n")
     username = input("Administrator ID [admin]: ").strip() or "admin"
     if not re.fullmatch("[A-Za-z][A-Za-z0-9_-]{2,31}", username):
         raise SystemExit("Invalid administrator ID.")

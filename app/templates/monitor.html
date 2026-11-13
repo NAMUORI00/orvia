@@ -1,0 +1,109 @@
+{% extends 'base.html' %}{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">ORVIA</p>
+    <h1>운영 현황</h1>
+  </div>
+  <label
+    >조회 기간<select id="monitor-window">
+      <option value="2">최근 2시간</option>
+      <option value="24">최근 24시간</option>
+      <option value="168">최근 7일</option>
+    </select></label
+  ><span id="monitor-time">수집 대기</span>
+</section>
+<p class="muted">1분 간격 · 7일 보관 · 실행 상태와 자원 지표만 수집</p>
+<div id="monitor-summary" class="usage-summary"></div>
+<section class="card card-pad">
+  <div class="usage-heading">
+    <h2>사용자 활동</h2>
+    <button id="monitor-reset" class="secondary" type="button">
+      전체 사용자
+    </button>
+  </div>
+  <p class="muted">
+    사용자를 선택하면 해당 계정의 사용 추이를 표시합니다. 프로세스 이름은 최대
+    5분 간격으로 갱신합니다.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>계정</th>
+          <th>상태</th>
+          <th>CPU 사용량</th>
+          <th>메모리</th>
+          <th>수신 / 송신</th>
+          <th>패킷 / 초</th>
+          <th>주요 프로세스</th>
+        </tr>
+      </thead>
+      <tbody id="monitor-users"></tbody>
+    </table>
+  </div>
+</section>
+<section id="monitor-account" class="card card-pad" hidden></section>
+<div class="monitor-charts">
+  <section class="card card-pad">
+    <h3 id="cpu-chart-title">CPU 사용 추이</h3>
+    <svg
+      id="cpu-history"
+      viewBox="0 0 600 150"
+      role="img"
+      aria-label="CPU 사용 추이"
+    ></svg>
+    <p id="cpu-chart-range" class="muted"></p>
+  </section>
+  <section class="card card-pad">
+    <h3>네트워크 사용 추이</h3>
+    <svg
+      id="net-history"
+      viewBox="0 0 600 150"
+      role="img"
+      aria-label="네트워크 사용 추이"
+    ></svg>
+    <p id="net-chart-range" class="muted"></p>
+  </section>
+</div>
+<details class="card card-pad">
+  <summary>하드웨어 상태</summary>
+  <div id="monitor-hardware" class="monitor-hardware"></div>
+  <div class="monitor-charts">
+    <div>
+      <h3>평균 GPU 사용 추이</h3>
+      <svg
+        id="gpu-history"
+        viewBox="0 0 600 150"
+        role="img"
+        aria-label="평균 GPU 사용 추이"
+      ></svg>
+      <p id="gpu-chart-range"></p>
+    </div>
+    <div>
+      <h3>시스템 메모리 사용 추이</h3>
+      <svg
+        id="memory-history"
+        viewBox="0 0 600 150"
+        role="img"
+        aria-label="시스템 메모리 사용 추이"
+      ></svg>
+      <p id="memory-chart-range"></p>
+    </div>
+  </div>
+</details>
+<section class="card card-pad">
+  <h2>상태 변경 기록</h2>
+  <div id="monitor-events"></div>
+</section>
+<p id="monitor-error" role="status"></p>
+<details class="card card-pad">
+  <summary>집계 기준</summary>
+  <p class="muted">
+    CPU 사용량은 논리 CPU 개수로 환산합니다. 송수신량은 컨테이너 네트워크
+    인터페이스 기준이며 패킷 본문·접속 목적지·명령 인자·파일 내용은 수집하지
+    않습니다. 실행 상태는 외부 SSH 접속 성공 여부를 뜻하지 않습니다. 프로세스
+    이름만으로 연구 내용이나 작업 목적을 판단하지 않습니다.
+  </p>
+</details>
+<script defer src="/static/monitor.js"></script>
+{% endblock %}

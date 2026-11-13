@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.5.5")
+    return jsonify(status="ok", version="0.6.0")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -197,7 +197,7 @@ def manual_pdf():
         pdf,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name="LabHarbor_" + lab["id"] + "_" + document["language"] + ".pdf",
+        download_name="Orvia_" + lab["id"] + "_" + document["language"] + ".pdf",
         max_age=0,
     )
 
@@ -220,7 +220,7 @@ def lab_page(lab_id, section="overview"):
         images="환경 템플릿",
         backups="백업",
         maintenance="환경 관리",
-        files="파일 탐색",
+        files="저장공간 분석",
     )
     if section not in titles:
         abort(404)
@@ -460,3 +460,34 @@ def language_options():
             for code, phrases in TRANSLATIONS.items()
         }
     }
+
+
+@app.get("/api/storage-usage/<lab_id>")
+def storage_usage_api(lab_id):
+    try:
+        return jsonify(
+            call(
+                dict(
+                    action="storage_usage",
+                    lab=lab_id,
+                    path=request.args.get("path", ""),
+                )
+            )
+        )
+    except (ValueError, OSError) as e:
+        return jsonify(error=str(e)), 400
+
+
+@app.get("/monitor")
+def monitor_page():
+    return render_template("monitor.html")
+
+
+@app.get("/api/telemetry")
+def telemetry_api():
+    try:
+        return jsonify(
+            call({"action": "telemetry", "hours": request.args.get("hours", "2")})
+        )
+    except ValueError as e:
+        return jsonify(error=str(e)), 400

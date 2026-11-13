@@ -43,3 +43,10 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Verified account creation, official CUDA image replacement, home-data persistence, writable-root snapshot recreation, restart recovery and rollback on an injected second-container start failure.
 - GPU payload mapping is unit-tested for multiple GPUs; live reassignment testing retains GPU 0 only. No production laboratory GPU is reassigned for validation.
 - Korean/English PDFs are rendered and inspected. No full-host reboot, crash-during-transaction recovery, every provider image tag, or clean-host installation is claimed.
+
+## 0.6.0 Orvia monitoring and storage analysis
+
+- Read-only verification of registered account metadata, CPU/memory/block-I/O statistics, network byte/packet counters, process names and eight GPU sensors. No container restart or GPU workload probe is required.
+- Storage tests verify hidden-cache inclusion, symlink exclusion, hard-link deduplication, sparse-file block accounting and explicit partial results. Telemetry tests verify interface counter parsing and edge-triggered event records.
+- Hardware/traffic rates are recorded from deployment onward. Seven-day retention and historical-window queries are configured; seven elapsed days of operation have not been observed at release.
+- Existing account container IDs and start timestamps are compared before and after deployment.

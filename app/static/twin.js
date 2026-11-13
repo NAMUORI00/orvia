@@ -203,7 +203,7 @@
         link("사용자 관리", url + "/accounts"),
         link("자원 배정", url + "/resources"),
         link("환경 관리", url + "/maintenance"),
-        link("파일 탐색", url + "/files"),
+        link("저장공간 분석", url + "/files"),
         link("이용 안내서", "/manual?lab=" + encodeURIComponent(lab.id)),
       );
       nodes.push(actions);

@@ -8,13 +8,15 @@
 <a class="allocation-card" href="/labs/{{lab.id}}/gpu"><span class="resource-icon">▦</span><h3>GPU</h3><div class="gpu-slots">{% for g in data.gpus %}<span class="{{'allocated' if g.index in (lab.gpu_indices or [lab.gpu]) else ''}}">{{g.index}}</span>{% endfor %}</div><strong>{{(lab.gpu_indices or [lab.gpu])|length}} · 배정 GPU</strong><small>GPU 상세 ›</small></a>
 <a class="allocation-card" href="/labs/{{lab.id}}/limits"><span class="resource-icon">▤</span><h3>CPU · 메모리</h3>{% for u in current.users %}<div class="allocation-user"><b>{{u.name}}</b><span>CPU {{u.cpu or '제한 없음'}}{% if u.cpu %} cores{% endif %} · RAM {{u.ram or '제한 없음'}}{% if u.ram %} GiB{% endif %}</span></div>{% endfor %}<small>할당 조절 ›</small></a>
 <a class="allocation-card storage-visual" href="/labs/{{lab.id}}/storage"><span class="disk-stack" aria-hidden="true"><i></i><i></i><i></i></span><h3>공유 저장공간</h3><strong>{{lab.used_gb}} / {{lab.storage_gb}} GB</strong><progress value="{{lab.used_gb}}" max="{{lab.storage_gb}}" aria-label="저장공간 사용량"></progress><small>용량 관리 ›</small></a>
-<div class="allocation-card"><h3>서버 저장 경로</h3><code class="host-storage-path">{{lab.storage_path}}</code><p class="muted">서버 관리자 SSH · SFTP 접속 기준</p><a href="/labs/{{lab.id}}/files" class="button secondary">파일 탐색 ›</a></div>
+<div class="allocation-card"><h3>서버 저장 경로</h3><code class="host-storage-path">{{lab.storage_path}}</code><p class="muted">서버 관리자 SSH · SFTP 접속 기준</p><a href="/labs/{{lab.id}}/files" class="button secondary">저장공간 분석 ›</a></div>
 </div></section>
 
 <details class="card card-pad"><summary>연구실 정보</summary><form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-current="{{lab.title}}" data-impact="즉시 적용" data-review="표시 이름만 변경합니다. 사용자·GPU·저장공간·실행 작업은 유지됩니다."><input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="metadata"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="confirm" value="{{lab.id}}"><label for="lab-title">연구실 이름</label><input id="lab-title" name="title" value="{{lab.title}}" maxlength="100" required><button {% if not lab.writable %}disabled{% endif %}>저장</button></form></details>
 <div class="lab-shortcuts"><a href="/manual?lab={{lab.id}}">이용 안내서 ›</a><a href="/labs/{{lab.id}}/backups">백업 ›</a><a href="/labs/{{lab.id}}/images">환경 템플릿 ›</a></div>
 <details class="card card-pad"><summary>고급 관리</summary><div class="settings-list"><a class="settings-item" href="/labs/{{lab.id}}/images">환경 템플릿 ›</a><a class="settings-item" href="/labs/{{lab.id}}/backups">백업 ›</a><a class="settings-item" href="/labs/{{lab.id}}/maintenance">환경 관리 ›</a></div></details>
 {% elif section=='files' %}
+{% include 'storage_usage.html' %}
+<details class="card card-pad"><summary>파일 탐색</summary>
 <section class="card card-pad"><h2>파일 탐색</h2><p>읽기 전용 · UTF-8 텍스트 · 최대 64 KiB</p><dl class="storage-location"><dt>서버 저장 경로</dt><dd><code>{{lab.storage_path}}</code></dd></dl><p class="muted">서버 관리자 SSH · SFTP 접속 기준</p><a href="{{url_for('lab_page',lab_id=lab.id,section='files')}}">저장공간 루트</a>
 {% if file_error %}<p role="alert">{{file_error}}</p>{% endif %}
 {% if files %}<div class="file-toolbar"><code>/{{files.path}}</code>{% if files.path %}<a href="{{url_for('lab_page',lab_id=lab.id,section='files',path=files.parent)}}">상위 폴더 ↑</a>{% endif %}</div>
@@ -22,6 +24,7 @@
 {% else %}<div class="file-editor" role="region" aria-label="텍스트 미리보기">{% for line in files.text.split('
 ') %}<div class="code-line"><span class="line-number" aria-hidden="true">{{loop.index}}</span><code>{{line or ' '}}</code></div>{% endfor %}</div>{% endif %}{% endif %}
 <p class="muted">숨김 파일·관리용 파일·다른 경로로 연결된 파일은 표시하지 않습니다.</p></section>
+</details>
 {% elif section=='maintenance' %}
 <section class="card card-pad"><h2>환경 재시작</h2><p>메모리와 임시 폴더의 내용은 유지되지 않습니다.</p><p>선택한 사용자 환경만 재시작합니다. 실행 중인 프로그램과 접속은 종료되며, 영구 저장공간의 파일은 유지됩니다.</p>
 {% for u in current.users %}<form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-impact="사용자 환경 재시작" data-submit-label="재시작" data-review="실행 중인 프로그램과 접속이 종료됩니다. 저장하지 않은 내용은 복구할 수 없습니다. 다른 연구실은 재시작하지 않습니다.">

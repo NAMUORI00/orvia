@@ -195,7 +195,7 @@ def snapshot():
         + str(os.cpu_count())
         + " threads",
         updated=time.strftime("%H:%M:%S"),
-        mode="LabHarbor",
+        mode="Orvia",
     )
     CACHE.update(time=time.monotonic(), data=data)
     return data
@@ -304,6 +304,10 @@ class Handler(socketserver.StreamRequestHandler):
             with LOCK:
                 if req.get("action") == "status":
                     result = snapshot()
+                elif req.get("action") == "telemetry":
+                    result = __import__("telemetry").read(req.get("hours", 2))
+                elif req.get("action") == "storage_usage":
+                    result = __import__("storage_usage").get(req)
                 elif req.get("action") == "files":
                     import filebrowser
 
@@ -346,11 +350,23 @@ class Handler(socketserver.StreamRequestHandler):
                     result = hotops.dispatch(req)
                 else:
                     result = operate(req)
-            if req.get("action") not in {"status", "catalog"}:
+            if req.get("action") not in {
+                "status",
+                "catalog",
+                "telemetry",
+                "storage_usage",
+                "files",
+            }:
                 audit(req.get("action"), req.get("lab"), req.get("user"), "ok")
             response = {"ok": True, "data": result}
         except Exception as e:
-            if req.get("action") not in {"status", "catalog"}:
+            if req.get("action") not in {
+                "status",
+                "catalog",
+                "telemetry",
+                "storage_usage",
+                "files",
+            }:
                 audit(
                     req.get("action"),
                     req.get("lab"),
@@ -374,4 +390,5 @@ if __name__ == "__main__":
 
         os.chown(SOCK, 0, grp.getgrnam("h200-console").gr_gid)
         os.chmod(SOCK, 0o660)
+        __import__("telemetry").start()
         server.serve_forever()

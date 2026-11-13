@@ -25,7 +25,7 @@ def catalog(provider):
             return old
         url, repo = SOURCES[provider]
         try:
-            headers = {"User-Agent": "LabHarbor/0.5"}
+            headers = {"User-Agent": "Orvia/0.6"}
             if provider == "pytorch":
                 with urllib.request.urlopen(
                     "https://nvcr.io/proxy_auth?scope=repository:nvidia/pytorch:pull&service=nvcr.io",

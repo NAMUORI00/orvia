@@ -338,7 +338,7 @@ def worker(p, job):
         )
         unit = run("systemd-escape", "--path", "--suffix=mount", str(base))
         pathlib.Path("/etc/systemd/system", unit).write_text(
-            "[Unit]\nDescription=LabHarbor persistent storage\nRequiresMountsFor="
+            "[Unit]\nDescription=Orvia persistent storage\nRequiresMountsFor="
             + str(root)
             + "\n[Mount]\nWhat="
             + str(disk)
@@ -506,7 +506,7 @@ def worker(p, job):
         )
         service = "labharbor-" + p["id"] + ".service"
         pathlib.Path("/etc/systemd/system", service).write_text(
-            "[Unit]\nDescription=LabHarbor research account\nRequires=docker.service "
+            "[Unit]\nDescription=Orvia research account\nRequires=docker.service "
             + unit
             + "\nAfter=docker.service "
             + unit
@@ -519,7 +519,7 @@ def worker(p, job):
         )
         timer = "labharbor-" + p["id"] + ".timer"
         pathlib.Path("/etc/systemd/system", timer).write_text(
-            "[Unit]\nDescription=LabHarbor account recovery\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\nUnit="
+            "[Unit]\nDescription=Orvia account recovery\n[Timer]\nOnBootSec=60\nOnUnitActiveSec=60\nUnit="
             + service
             + "\n[Install]\nWantedBy=timers.target\n"
         )

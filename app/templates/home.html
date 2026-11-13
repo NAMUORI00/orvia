@@ -1,5 +1,5 @@
 {% extends 'base.html' %}{% block content %}
-<section class="page-head"><div><p class="eyebrow">LABHARBOR</p><h1>서버 현황</h1></div><a class="button" href="/provision">연구실 생성</a></section>
+<section class="page-head"><div><p class="eyebrow">ORVIA</p><h1>서버 현황</h1></div><a class="button" href="/provision">연구실 생성</a></section>
 <div class="twin-metrics"><div><span>연구실</span><strong id="twin-labs">{{data.labs|length}}</strong></div><div><span>사용자</span><strong id="twin-users">{{data.labs|map(attribute='users')|map('length')|sum}}</strong></div><div><span>미배정 GPU</span><strong id="twin-free">—</strong></div><div><span>시스템 메모리</span><strong id="twin-memory">{{data.memory_used_gib}} / {{data.memory_total_gib}} GiB</strong></div><div class="twin-sync"><span id="twin-sync">실시간 동기화</span><small id="twin-time">{{data.updated}}</small></div></div>
 <section class="twin-workspace" id="twin" data-state='{{data|tojson}}'>
 <div class="twin-map" id="twin-map"><div class="twin-map-head"><h2>자원 배치도</h2><div class="map-tools"><span>● 배정 · ○ 미배정</span><button id="twin-reset" type="button">전체 자원</button></div></div>
