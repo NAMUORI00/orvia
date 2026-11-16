@@ -54,7 +54,7 @@ def mount_signature(o):
 
 
 def validate(spec, user, o):
-    if sum(hotops.name(spec, u) == hotops.name(spec, user) for u in spec["users"]) != 1:
+    if spec.get("account_layout") != "shared" and sum(hotops.name(spec, u) == hotops.name(spec, user) for u in spec["users"]) != 1:
         raise ValueError("여러 사용자가 공유하는 환경은 별도 이전이 필요합니다.")
     storage = pathlib.Path(spec["storage"]).resolve()
     if not os.path.ismount(storage):

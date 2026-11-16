@@ -1,0 +1,19 @@
+<section class="card card-pad">
+  <div class="blueprint-heading"><h2>연구실 재시작</h2><span class="badge">{{lab.users|length}} · 사용자</span></div>
+  <p>연구실 전체의 접속과 실행 작업이 종료됩니다. 계정과 저장 파일은 유지됩니다.</p>
+  <p class="safe-edit">GPU 사용 중에는 실행하지 않습니다. 적용 직전에 사용 상태를 다시 확인합니다.</p>
+  {% if current.users %}<form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-impact="연구실 전체 재시작" data-review="연구실 전체의 SSH 접속과 CPU 작업이 종료됩니다. GPU 사용 중이면 재시작하지 않습니다. 계정과 영구 저장 자료는 유지됩니다." data-submit-label="연구실 재시작">
+    <input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="lab_restart"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="confirm" value="{{lab.id}}"><input type="hidden" name="user" value="{{current.users[0].name}}"><input type="hidden" name="expected_fingerprint" value="{{current.fingerprint}}">
+    <label class="check-label"><input type="checkbox" name="ack_downtime" value="yes" required> 연구실 전체 작업 중단 확인</label>
+    <button class="danger" {% if not lab.writable %}disabled{% endif %}>재시작 검토</button>
+  </form>{% endif %}
+</section>
+<details class="card card-pad"><summary>고급 복구</summary>
+  <p>현재 개발환경과 저장 연결로 컨테이너를 재생성합니다. 이전 컨테이너는 복구용으로 보관됩니다.</p>
+  {% for u in current.users|unique(attribute='container') %}<details class="person-action"><summary>{{ '연구실 환경 재생성' if current.account_layout=='shared' else u.name }} <span>›</span></summary>
+  <form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-impact="환경 재생성" data-submit-label="재생성" data-review="이 컨테이너를 사용하는 모든 계정의 접속과 실행 작업이 종료됩니다. 현재 이미지와 저장 연결은 유지하며 이전 환경은 복구용으로 보관합니다.">
+    <input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="maintenance_recreate"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="user" value="{{u.name}}"><input type="hidden" name="expected_id" value="{{u.id}}"><input type="hidden" name="expected_started" value="{{u.started}}">
+    <label class="check-label"><input type="checkbox" name="ack_downtime" value="yes" required> 실행 작업 중단 확인</label><label class="check-label"><input type="checkbox" name="ack_recreate" value="yes" required> 동일 구성 재생성 확인</label><label>연구실 ID 확인</label><input name="confirm" placeholder="{{lab.id}}" required><button class="danger" {% if not lab.writable %}disabled{% endif %}>재생성 검토</button>
+  </form></details>{% endfor %}
+</details>
+<details class="card card-pad"><summary>환경 관리 기록</summary>{% for item in catalog.maintenance if item.lab==lab.id %}<p>{{item.time}} · {{item.state}}</p>{% else %}<p>작업 없음</p>{% endfor %}</details>

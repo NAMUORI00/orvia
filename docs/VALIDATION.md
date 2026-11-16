@@ -115,3 +115,16 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Laboratory overview and CPU/memory pages prioritize actual usage. Allocation controls are folded separately. Account CPU is Docker CPU percentage divided by logical CPU count; memory uses Docker reported bytes divided by host memory. Absolute core-equivalent and GiB values accompany percentages. Laboratory totals sum the configured account containers, not host-wide utilization.
 - A single latest SQLite row supplies each view; the endpoint strips process and unrelated account fields. No additional Docker stats/process sampling occurs on page requests. Refresh is once per minute and stops when hidden. Missing/stale samples show N/A instead of invented zeros.
 - Read-only browser validation used running graphics accounts; no allocation, restart or researcher container mutation was submitted.
+
+
+## 0.7.0 shared laboratory accounts and account management
+
+- New laboratories mount persistent home and account databases into one shared container. Legacy laboratories are not automatically migrated.
+- The existing Byun lab was converted through the dashboard after two GPU-idle checks. Its image, host key, Hasnain credential record and home path were retained.
+- Ten additional accounts were created through the dashboard. All eleven accounts passed real password SSH authentication on the lab port and detected both assigned GPUs, Python and Conda. No workloads were launched.
+- Other laboratories' seven container IDs and start timestamps remained unchanged. The shared container was not restarted during account creation or UI deployment.
+- Account cards expose details, metadata, password changes, backup and deletion progressively. Restart is a single lab-level control; GPU activity blocks it.
+- Account backups were exercised through the live UI without deleting the account. Deletion was tested on temporary fixture files: the home archive remained readable, the target account was removed, and the peer data/credential record was unchanged. Live research accounts were not deleted or password-reset for testing.
+- Shared-container counters are reported once at lab level; unavailable per-user network/CPU attribution is not fabricated.
+- 96 automated tests passed, including bound-file inode preservation, password target isolation, GPU activity gates, and backup/delete safeguards.
+- Bound account files survive stop/start by design; no additional production restart was performed solely for persistence testing.

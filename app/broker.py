@@ -85,6 +85,9 @@ def checked_container(c, s, u):
     assert {d["PathOnHost"] for d in obj["HostConfig"]["Devices"]} == expected_devices
     assert obj["HostConfig"]["PidMode"] != "host"
     expected = str(pathlib.Path(s["storage"]) / u["name"])
+    if s.get("account_layout") == "shared":
+        __import__("shared_accounts").validate_shared(s, obj)
+        return obj
     assert any(
         m["Source"] == expected and m["Destination"] == "/home/" + u["name"]
         for m in obj["Mounts"]
@@ -237,7 +240,7 @@ def operate(req):
             and isinstance(req.get("password"), str)
             and 10 <= len(req["password"]) <= 128
         ), "비밀번호는 10~128자입니다."
-        p = pathlib.Path(s["storage"]) / ".admin" / user / "shadow"
+        p = pathlib.Path(s["storage"]) / ".admin" / ("shared" if s.get("account_layout") == "shared" else user) / "shadow"
         assert not p.is_symlink()
         h = crypt.crypt(req["password"], crypt.mksalt(crypt.METHOD_SHA512))
         with p.open("r+") as f:
@@ -278,7 +281,7 @@ def operate(req):
         run("resize2fs", source, timeout=120)
     else:
         for u in members:
-            n = s["prefix"] + u["name"]
+            n = u.get("container", s["prefix"] + u["name"])
             obj = checked_container(c, s, u)
             if action == "start":
                 run("docker", "start", n)
@@ -349,6 +352,11 @@ class Handler(socketserver.StreamRequestHandler):
                     "metadata",
                     "account_metadata",
                     "account_create",
+                    "account_backup",
+                    "account_delete",
+                    "lab_restart",
+                    "account_password",
+                    "lab_share",
                     "environment_apply",
                     "gpu_reconfigure",
                     "maintenance_restart",

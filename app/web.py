@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.6.10")
+    return jsonify(status="ok", version="0.7.0")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -306,6 +306,9 @@ def provision_prepare():
         "title",
         "new_user",
         "password",
+        "password_confirm",
+        "confirm_user",
+        "ack_delete",
         "source_container",
         "image_mode",
         "image_provider",
@@ -374,6 +377,9 @@ def hot_action():
         "consistency",
         "new_user",
         "password",
+        "password_confirm",
+        "confirm_user",
+        "ack_delete",
         "image_provider",
         "image_tag",
         "root_access",
@@ -391,6 +397,11 @@ def hot_action():
     target = {
         "account_metadata": "accounts",
         "account_create": "accounts",
+        "account_backup": "accounts",
+        "account_delete": "accounts",
+        "lab_restart": "maintenance",
+        "account_password": "accounts",
+        "lab_share": "accounts",
         "gpu_reconfigure": "gpu",
         "maintenance_restart": "maintenance",
         "maintenance_recreate": "maintenance",

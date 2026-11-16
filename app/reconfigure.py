@@ -7,7 +7,7 @@ import hotops, maintenance, recovery
 
 def fingerprint(objects):
     return hashlib.sha256(
-        json.dumps(sorted((o["Id"], o["State"]["StartedAt"]) for o in objects)).encode()
+        json.dumps(sorted({(o["Id"], o["State"]["StartedAt"]) for o in objects})).encode()
     ).hexdigest()
 
 
@@ -92,7 +92,8 @@ def apply(req, images=None, lock_owned=False, source_image=None, root_access=Fal
     for u in spec["users"]:
         _, _, _, o = hotops.authorize(dict(req, user=u["name"]))
         maintenance.validate(spec, u, o)
-        objects.append(o)
+        if not any(existing["Id"] == o["Id"] for existing in objects):
+            objects.append(o)
     if fingerprint(objects) != req.get("expected_fingerprint"):
         raise ValueError("환경 상태가 변경되었습니다. 화면을 새로 열어 확인하세요.")
     if not lock_owned and not hotops.JOB_LOCK.acquire(blocking=False):

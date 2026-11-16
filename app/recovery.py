@@ -49,7 +49,7 @@ def install(lab, spec, objects):
     record = dict(
         schema_version=1, storage=spec["storage"], disk=spec.get("disk"), containers=[]
     )
-    for o in objects:
+    for o in {o["Id"]: o for o in objects}.values():
         bridges = []
         for name in o["NetworkSettings"]["Networks"]:
             if name in ("none", "host", "bridge"):

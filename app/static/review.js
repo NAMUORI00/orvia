@@ -26,6 +26,7 @@
       if (form.dataset.impact) add("적용 방식", form.dataset.impact);
       for (const [key, label] of [
         ["user", "대상 사용자"],
+        ["new_user", "새 계정 ID"],
         ["title", "연구실 이름"],
         ["cpu", "CPU 한도"],
         ["ram", "메모리 한도"],

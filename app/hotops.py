@@ -90,6 +90,7 @@ def catalog():
             dict(
                 id=key,
                 title=s["title"],
+                account_layout=s.get("account_layout", "separate"),
                 users=users,
                 writable=key in c["write_labs"],
                 fingerprint=__import__("reconfigure").fingerprint(
@@ -151,11 +152,23 @@ def catalog():
 
 
 def dispatch(req):
+    if req.get("action") in {"account_backup", "account_delete"}:
+        return __import__("account_lifecycle").submit(req)
+
+    if req.get("action") == "lab_restart":
+        return __import__("shared_migration").restart(req)
+
+    if req.get("action") == "account_password":
+        return __import__("shared_accounts").password(req)
+
+    if req.get("action") == "lab_share":
+        return __import__("shared_migration").apply(req)
+
     if req.get("action") == "environment_apply":
         return __import__("environments").submit(req)
 
     if req.get("action") == "account_create":
-        return __import__("accounts").submit(req)
+        return __import__("shared_accounts").submit(req)
 
     if req.get("action") == "gpu_reconfigure":
         return __import__("reconfigure").submit(req)
@@ -447,7 +460,7 @@ def dispatch(req):
 
 def backup(c, s, job):
     try:
-        members = [(u, obj(name(s, u))) for u in s["users"]]
+        members = [(u, obj(n)) for n, u in {name(s, u): u for u in s["users"]}.items()]
         for u, o in members:
             authorize(dict(lab=job["lab"], user=u["name"], confirm=job["lab"]))
         root = pathlib.Path(c.get("backup_root", "/var/lib/labharbor/backups"))

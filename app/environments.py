@@ -70,7 +70,11 @@ def worker(req, source, objects, spec, job):
         hotops.run("docker", "pull", source, timeout=1800)
         base = hotops.build_source(source)
         images = {}
+        built = set()
         for user, old in zip(spec["users"], objects):
+            if old["Id"] in built:
+                continue
+            built.add(old["Id"])
             name = user["name"]
             uid = int(user["uid"])
             if not re.fullmatch("[a-zA-Z][a-zA-Z0-9_-]{1,30}", name):

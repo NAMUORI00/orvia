@@ -45,8 +45,9 @@ def sample(previous=None, processes=None):
     now = int(time.time())
     config = hotops.cfg()
     accounts = []
+    shared_totals = {}
     processes = processes if processes is not None else {}
-    names = [hotops.name(s, u) for s in config["labs"].values() for u in s["users"]]
+    names = sorted({hotops.name(s, u) for s in config["labs"].values() for u in s["users"]})
     ids = hotops.run("docker", "ps", "-aq", timeout=10).split()
     objects = (
         json.loads(hotops.run("docker", "inspect", *ids, timeout=15)) if ids else []
@@ -69,6 +70,7 @@ def sample(previous=None, processes=None):
         )
         stats = {x["Name"]: x for x in (json.loads(line) for line in raw.splitlines())}
     prior = {a["container"]: a for a in (previous or {}).get("accounts", [])}
+    prior.update({a["container"]: a for a in (previous or {}).get("shared_totals", {}).values()})
     for lab, s in config["labs"].items():
         for u in s["users"]:
             name = hotops.name(s, u)
@@ -144,6 +146,12 @@ def sample(previous=None, processes=None):
                     except subprocess.SubprocessError:
                         cached = {}
                 a["processes"] = cached.get("items", [])
+            if s.get("account_layout") == "shared":
+                # Container counters cannot be attributed to individual login users.
+                shared_totals.setdefault(lab, dict(a))
+                a["scope"] = "shared_container"
+                a["cpu"] = a["memory"] = a["network"] = a["rates"] = a["block_io"] = None
+                a["processes"] = []
             accounts.append(a)
     gpus = []
     raw = hotops.run(
@@ -219,6 +227,7 @@ def sample(previous=None, processes=None):
         cpu_idle=cpu_idle,
         cpu_util=cpu_util,
         accounts=accounts,
+        shared_totals=shared_totals,
         gpus=gpus,
         disks=disks,
         load=os.getloadavg()[0],
@@ -382,5 +391,5 @@ def latest_lab(lab):
     if not row:
         return dict(ts=None, cpu_count=None, memory_total=None, accounts=[])
     data = json.loads(row[0])
-    return dict(ts=data["ts"], cpu_count=data.get("cpu_count"), memory_total=data.get("memory_total"),
+    return dict(ts=data["ts"], cpu_count=data.get("cpu_count"), memory_total=data.get("memory_total"), shared=data.get("shared_totals", {}).get(lab),
         accounts=[{k:a.get(k) for k in ("user","running","cpu","memory")} for a in data.get("accounts",[]) if a["lab"]==lab and a["user"] in names])
