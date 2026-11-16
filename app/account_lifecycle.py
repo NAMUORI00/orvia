@@ -74,7 +74,7 @@ def worker(req, job):
         archive.chmod(0o600)
         subprocess.run(["tar", "-tf", str(archive)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True, timeout=300)
         hotops.save(target / "account.json", dict(lab=req["lab"], user=user, container=obj, scope="Personal home and account metadata; image layers are not included"))
-        admin = root / ".admin" / ("shared" if spec.get("account_layout") == "shared" else user["name"])
+        admin = root / user.get("credential_dir", ".admin/" + ("shared" if spec.get("account_layout") == "shared" else user["name"]))
         for key in DATABASES:
             source = admin / key
             if source.exists():

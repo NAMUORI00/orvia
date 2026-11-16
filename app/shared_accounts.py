@@ -27,7 +27,7 @@ def password(req):
     try:
         c, spec, user, obj = hotops.authorize(req)
         root = pathlib.Path(spec["storage"]).resolve()
-        path = root / ".admin" / ("shared" if spec.get("account_layout") == "shared" else user["name"]) / "shadow"
+        path = root / user.get("credential_dir", ".admin/" + ("shared" if spec.get("account_layout") == "shared" else user["name"])) / "shadow"
         if not os.path.ismount(root) or path.is_symlink() or not path.resolve().is_relative_to(root):
             raise ValueError("영구 계정 정보 연결을 확인하세요.")
         if not any(m["Destination"] == "/etc/shadow" and pathlib.Path(m["Source"]).resolve() == path for m in obj["Mounts"]):

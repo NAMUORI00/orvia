@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.7.0")
+    return jsonify(status="ok", version="0.7.1")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -397,6 +397,7 @@ def hot_action():
     target = {
         "account_metadata": "accounts",
         "account_create": "accounts",
+        "lab_separate": "maintenance",
         "account_backup": "accounts",
         "account_delete": "accounts",
         "lab_restart": "maintenance",

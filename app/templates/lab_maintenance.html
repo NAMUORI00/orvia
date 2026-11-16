@@ -17,3 +17,8 @@
   </form></details>{% endfor %}
 </details>
 <details class="card card-pad"><summary>환경 관리 기록</summary>{% for item in catalog.maintenance if item.lab==lab.id %}<p>{{item.time}} · {{item.state}}</p>{% else %}<p>작업 없음</p>{% endfor %}</details>
+
+{% if current.account_layout == 'shared' and current.users %}
+<details class="card card-pad"><summary>컨테이너 구성 변경</summary><h2>사용자별 컨테이너 분리</h2><p>연구실 GPU와 총 저장용량을 유지하며 개인 컨테이너·개인 SSH 포트로 분리합니다. 개인 폴더와 비밀번호를 보존하고 공동 자료 폴더를 연결합니다.</p><form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-impact="사용자별 컨테이너 분리" data-review="GPU 사용 또는 사용자 프로세스가 감지되면 중단합니다. 기존 계정과 개인 폴더는 유지되며 접속 포트가 사용자별로 변경됩니다. 이전 컨테이너는 복구용으로 보관합니다."><input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="lab_separate"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="user" value="{{current.users[0].name}}"><input type="hidden" name="expected_fingerprint" value="{{current.fingerprint}}"><label class="check-label"><input type="checkbox" name="ack_downtime" value="yes" required> 접속·실행 작업 종료 확인</label><label class="check-label"><input type="checkbox" name="ack_recreate" value="yes" required> 사용자별 환경과 포트 변경 확인</label><label>연구실 ID 확인</label><input name="confirm" required placeholder="{{lab.id}}"><button>분리 전환 검토</button></form></details>
+{% endif %}
+<section class="card card-pad"><h2>구성 변경 기록</h2><div id="backup-jobs" data-lab="{{lab.id}}">{% for j in catalog.jobs if j.lab==lab.id and j.kind=='layout' %}<p>{{j.time}} · {{j.message}}</p>{% else %}<p>작업 없음</p>{% endfor %}</div></section>

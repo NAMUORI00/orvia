@@ -64,3 +64,7 @@ Validated on one live H200 host: bilingual UI/PDFs, isolated GPU-0 account creat
 ## License
 
 MIT. Bundled Nanum Gothic font: SIL Open Font License; see `app/fonts/OFL.txt`. Third-party Python wheels retain their upstream licenses.
+
+### Laboratory account layout
+
+New laboratories group individual user containers under one laboratory. Each user has a separate SSH port and private home. GPUs and the total storage allocation are shared at laboratory level; `/shared` provides an explicit common directory. Account creation does not restart existing users. Existing shared-container laboratories are supported, with guarded migration under environment management. System-image changes require a separate snapshot workflow before migration.

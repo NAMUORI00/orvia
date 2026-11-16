@@ -128,3 +128,16 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Shared-container counters are reported once at lab level; unavailable per-user network/CPU attribution is not fabricated.
 - 96 automated tests passed, including bound-file inode preservation, password target isolation, GPU activity gates, and backup/delete safeguards.
 - Bound account files survive stop/start by design; no additional production restart was performed solely for persistence testing.
+
+
+## 0.7.1 per-user environments within a laboratory
+
+- New laboratories default to separate account containers and SSH ports. Personal homes and a common `/shared` directory use the laboratory's single storage allocation.
+- Account creation respects the existing laboratory layout. Existing shared-container laboratories remain supported until explicitly migrated.
+- The dashboard migration checks the expected container state, GPU activity, user processes, and read-only system image. It preserves UID, password hashes, personal home paths, and the original image. The previous container remains stopped for recovery.
+- On 2026-11-16 the Byun laboratory was migrated through the dashboard: 11 containers, 11 distinct SSH ports, GPUs 3 and 4, and unchanged 5 TB storage allocation. All 11 actual SSH logins succeeded. Python 3.10.22 and Conda 26.7.2 remained available. Personal-home isolation, common-folder access, Docker socket denial, and protected password files were verified.
+- Seven containers belonging to other laboratories retained their IDs and start timestamps. No GPU workload was launched and no research container reboot test was performed.
+- CPU and memory remain unrestricted for this laboratory. Per-container limits are not an aggregate laboratory cgroup quota.
+- The retained rollback container and credential/configuration backups are intentional recovery assets. Newly created laboratory provisioning was covered by automated tests, not another live research-lab creation in this change.
+
+- Automated validation: 101 unit tests passed; Korean and English account views verified in the browser after deployment.

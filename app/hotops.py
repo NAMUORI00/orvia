@@ -152,6 +152,9 @@ def catalog():
 
 
 def dispatch(req):
+    if req.get("action") == "lab_separate":
+        return __import__("separate_migration").submit(req)
+
     if req.get("action") in {"account_backup", "account_delete"}:
         return __import__("account_lifecycle").submit(req)
 
@@ -168,7 +171,8 @@ def dispatch(req):
         return __import__("environments").submit(req)
 
     if req.get("action") == "account_create":
-        return __import__("shared_accounts").submit(req)
+        spec = cfg()["labs"].get(req.get("lab"), {})
+        return __import__("shared_accounts" if spec.get("account_layout") == "shared" else "accounts").submit(req)
 
     if req.get("action") == "gpu_reconfigure":
         return __import__("reconfigure").submit(req)

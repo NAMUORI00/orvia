@@ -352,6 +352,7 @@ class Handler(socketserver.StreamRequestHandler):
                     "metadata",
                     "account_metadata",
                     "account_create",
+                    "lab_separate",
                     "account_backup",
                     "account_delete",
                     "lab_restart",

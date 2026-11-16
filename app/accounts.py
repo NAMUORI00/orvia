@@ -103,8 +103,10 @@ def worker(lab, name, password_hash, profile, source, job):
         (stage / "entrypoint.sh").write_text(
             (pathlib.Path(__file__).parent / "research-entrypoint.sh").read_text()
         )
+        common_rule = (f"RUN (getent group {int(s['shared_gid'])} || groupadd -g {int(s['shared_gid'])} orvia-shared) && usermod -a -G {int(s['shared_gid'])} {name}\n" if s.get("shared_folder") else "")
         (stage / "Dockerfile").write_text(
             f"FROM {hotops.build_source(source['Image'])}\nRUN groupadd -g {uid} {name} && useradd -u {uid} -g {uid} -M -s /bin/bash {name}\nCOPY entrypoint.sh /usr/local/sbin/research-entrypoint\nRUN chmod 755 /usr/local/sbin/research-entrypoint\n"
+            + common_rule
             + __import__("permissions").account_sudo_rule(
                 name, bool(s.get("root_access", False))
             )
@@ -189,6 +191,11 @@ def worker(lab, name, password_hash, profile, source, job):
                 Type="bind", Source=str(keys), Target="/etc/research-ssh", ReadOnly=True
             ),
         ]
+        if s.get("shared_folder"):
+            common = pathlib.Path(s["shared_folder"]).resolve()
+            if common != root.resolve() / "shared" or not common.is_dir():
+                raise ValueError("공동 자료 폴더 연결을 확인하세요.")
+            h["Mounts"].append(dict(Type="bind", Source=str(common), Target="/shared", ReadOnly=False))
         h["ReadonlyRootfs"] = True
         h["CapDrop"] = ["ALL"]
         h["CapAdd"] = [

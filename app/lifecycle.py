@@ -479,21 +479,11 @@ def worker(p, job):
         (home / ".bash_profile").write_text(". ~/.bashrc\n")
         for path in [home, *home.iterdir()]:
             os.chown(path, p["uid"], p["uid"])
-        # New laboratories use one container and persistent account databases.
-        shared = base / ".admin" / "shared"
-        shared.mkdir(mode=0o700)
-        for key in ("passwd", "group", "shadow", "gshadow"):
-            content = ((admin / "shadow").read_text() if key == "shadow" else run("docker", "run", "--rm", "--network=none", "--entrypoint", "/bin/cat", image, "/etc/" + key) + "\n")
-            if key == "group":
-                group_id = next(i for i in range(60001, 65000) if all(row.split(":")[2] != str(i) for row in content.splitlines()))
-                content += f"orvia-research:x:{group_id}:{p['user']}\n"
-            elif key == "gshadow":
-                content += f"orvia-research:!::{p['user']}\n"
-            (shared / key).write_text(content)
-            (shared / key).chmod(0o600 if key in ("shadow", "gshadow") else 0o644)
-        (shared / "entrypoint.sh").write_text((APP / "research-entrypoint.sh").read_text().replace("AllowUsers $RESEARCH_USER", "AllowGroups orvia-research"))
-        (shared / "entrypoint.sh").chmod(0o755)
-        progress("Starting laboratory container")
+        common = base / "shared"
+        common.mkdir(mode=0o2770)
+        os.chown(common, 0, p["uid"])
+        common.chmod(0o2770)
+        progress("Starting isolated account")
         net = network(p)
         args = [
             "docker",
@@ -537,9 +527,9 @@ def worker(p, job):
             "/home/" + p["user"],
         ]
         for src, dst, ro in [
-            (base, "/home", False),
-            *[(shared / key, "/etc/" + key, True) for key in ("passwd", "group", "shadow", "gshadow")],
-            (shared / "entrypoint.sh", "/usr/local/sbin/research-entrypoint", True),
+            (home, "/home/" + p["user"], False),
+            (common, "/shared", False),
+            (admin / "shadow", "/etc/shadow", True),
             (keys, "/etc/research-ssh", True),
         ]:
             args += [
@@ -609,8 +599,9 @@ def worker(p, job):
             storage=str(base),
             disk=str(disk),
             prefix="lh-" + p["id"] + "-",
-            account_layout="shared",
-            shared_container=name,
+            account_layout="separate",
+            shared_folder=str(common),
+            shared_gid=p["uid"],
             managed=True,
             source_image=official or p["source_image"],
             sandbox=False,
