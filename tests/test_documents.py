@@ -83,3 +83,18 @@ class Documents(unittest.TestCase):
             account_profile.clean(
                 {"joined_on": "2026-11-13", "expires_on": "2025-01-01"}
             )
+
+class AccountSelection(unittest.TestCase):
+    def test_excludes_account_from_rows_and_resource_details(self):
+        lab=dict(id='lab',home_only=True,users=[dict(name='student',port=2208),dict(name='admin',port=2208)])
+        accounts=[dict(name='student',cpu=2,permissions=dict(container_sudo=False)),dict(name='admin',cpu=8,permissions=dict(container_sudo=True))]
+        for lang in ['ko','en']:
+            d=documents.compose({}, {}, lab, accounts,lang,selected_accounts=['student'])
+            self.assertEqual([u['id'] for u in d['accounts']],['student'])
+            self.assertNotIn('admin',str(d))
+            self.assertEqual(next(r['value'] for r in d['resources'] if r['id']=='cpu'),'2 cores')
+        self.assertEqual(len(lab['users']),2)
+        self.assertEqual(len(accounts),2)
+    def test_empty_and_foreign_selection_rejected(self):
+        for selection in [[],['foreign']]:
+            with self.assertRaises(ValueError): documents.compose({}, {}, dict(id='lab',users=[dict(name='student')]),[],selected_accounts=selection)

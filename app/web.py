@@ -165,7 +165,7 @@ def api_action():
         return jsonify(error=str(e)), 403
 
 
-def access_document(lab_id, lang, note=""):
+def access_document(lab_id, lang, note="", selected_accounts=None):
     from documents import compose
 
     data = call({"action": "status"})
@@ -182,16 +182,22 @@ def access_document(lab_id, lang, note=""):
             os.environ.get("H200_WEB_CONFIG", "/etc/h200-console/web.json")
         ).read_text()
     )
-    return data, lab, compose(document_settings, data, lab, accounts, lang, note)
+    return data, lab, compose(document_settings, data, lab, accounts, lang, note, selected_accounts)
 
 
-@app.get("/manual")
+@app.route("/manual", methods=["GET", "POST"])
 def manual():
     from i18n import language
 
-    data, lab, document = access_document(request.args.get("lab"), language())
+    values = request.form if request.method == "POST" else request.args
+    selected = values.getlist("selected_account") if values.get("account_selection") == "explicit" else None
+    lang = values.get("document_language", language())
+    try:
+        data, lab, document = access_document(values.get("lab"), lang, values.get("note", ""), selected)
+    except ValueError as e:
+        return str(e), 400
     return render_template(
-        "manual.html", data=data, lab=lab, document=document, locale=language()
+        "manual.html", data=data, lab=lab, document=document, locale=lang, selected_accounts=[u["id"] for u in document["accounts"]]
     )
 
 
@@ -204,6 +210,7 @@ def manual_pdf():
             request.form.get("lab"),
             request.form.get("document_language", "ko"),
             request.form.get("note", ""),
+            request.form.getlist("selected_account") if request.form.get("account_selection") == "explicit" else None,
         )
         pdf = make_pdf(document)
     except ValueError as e:

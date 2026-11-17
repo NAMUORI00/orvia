@@ -11,9 +11,16 @@ def value(v):
     return NA if v is None or v == "" else str(v)
 
 
-def compose(settings, data, lab, accounts, lang="ko", note=""):
+def compose(settings, data, lab, accounts, lang="ko", note="", selected_accounts=None):
     if lang not in ("ko", "en") or len(note) > 600:
         raise ValueError("문서 언어와 추가 안내를 확인하세요.")
+    if selected_accounts is not None:
+        selected = set(selected_accounts)
+        known = {u["name"] for u in lab.get("users", [])}
+        if not selected or not selected <= known:
+            raise ValueError("출력할 계정을 한 개 이상 선택하세요.")
+        lab = dict(lab, users=[u for u in lab.get("users", []) if u["name"] in selected])
+        accounts = [u for u in accounts if u["name"] in selected]
     defaults = settings.get("document_defaults", {})
     profile = dict(defaults)
     profile.update(settings.get("document_labs", {}).get(lab["id"], {}))

@@ -862,5 +862,9 @@
   "컨테이너 이름과 관리 연결만 변경합니다. 호스트네임과 저장 경로는 변경하지 않습니다.": "Rename the container and management references only. Hostname and storage paths remain unchanged.",
   "Docker 시작 호스트네임": "Docker startup hostname",
   "시작 호스트네임 변경은 환경 재생성이 필요합니다.": "Changing the startup hostname requires container recreation.",
-  "컨테이너 이름과 관리 연결을 변경했습니다. 접속과 실행 작업은 유지됩니다.": "Container and management references renamed. Connections and running processes are preserved."
+  "컨테이너 이름과 관리 연결을 변경했습니다. 접속과 실행 작업은 유지됩니다.": "Container and management references renamed. Connections and running processes are preserved.",
+  "출력 계정": "Accounts to include",
+  "선택한 계정만 문서에 포함됩니다. 실제 계정은 변경되지 않습니다.": "Only selected accounts appear in the document. Actual accounts remain unchanged.",
+  "선택 미리보기": "Preview selection",
+  "출력할 계정을 한 개 이상 선택하세요.": "Select at least one account to include."
 }
