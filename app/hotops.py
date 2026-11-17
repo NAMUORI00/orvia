@@ -106,7 +106,7 @@ def catalog():
         (STATE / "jobs").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True
     )[:20]:
         j = json.loads(p.read_text())
-        if j.get("state") in {"running", "queued"} and not JOB_LOCK.locked():
+        if j.get("state") in {"running", "queued"} and not JOB_LOCK.locked() and not management_busy():
             j.update(
                 state="interrupted",
                 message="백업 작업이 중단되었습니다. 기존 파일을 확인하세요.",
@@ -659,3 +659,14 @@ def build_source(image):
     alias = "labharbor-base:" + digest.split(":", 1)[1]
     run("docker", "image", "tag", digest, alias)
     return alias
+
+
+def management_busy():
+    import fcntl
+    try:
+        with open('/run/h200-console/management.lock', 'a+') as gate:
+            try: fcntl.flock(gate, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError: return True
+            fcntl.flock(gate, fcntl.LOCK_UN)
+    except FileNotFoundError: pass
+    return False

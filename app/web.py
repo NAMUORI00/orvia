@@ -11,7 +11,7 @@ from flask import (
     url_for,
     send_file,
 )
-from werkzeug.security import check_password_hash
+from flask import has_request_context
 
 settings = json.loads(
     pathlib.Path(
@@ -34,6 +34,9 @@ lock = threading.Lock()
 
 
 def call(data):
+    data = dict(data)
+    if has_request_context() and data.get("action") != "linux_login":
+        data["_session"] = session.get("linux_token")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
         s.settimeout(150)
         s.connect(
@@ -55,10 +58,18 @@ def guard():
         token = request.headers.get("X-CSRF-Token") or request.form.get("csrf", "")
         if not secrets.compare_digest(token, session["csrf"]):
             abort(403)
+    if session.get("linux_token") and request.path not in ["/login", "/language"] and not request.path.startswith("/static/"):
+        try:
+            identity = call({"action": "linux_session"})
+            session["username"] = identity["username"]
+        except (OSError, ValueError):
+            session.clear()
+            if request.path.startswith("/api/"): abort(401)
+            return redirect(url_for("login"))
     if (
         request.path not in ["/login", "/language"]
         and not request.path.startswith("/static/")
-        and not session.get("admin")
+        and not session.get("linux_token")
     ):
         if request.path.startswith("/api/"):
             abort(401)
@@ -91,16 +102,17 @@ def login():
             failures = [t for t in attempts.get(key, []) if now - t < 900]
             if len(failures) >= 8:
                 abort(429)
-            if request.form.get("username") == settings.get(
-                "username", "admin"
-            ) and check_password_hash(
-                settings["password_hash"], request.form.get("password", "")
-            ):
+            try:
+                identity = call({"action": "linux_login", "username": request.form.get("username", ""), "password": request.form.get("password", "")})
+            except (OSError, ValueError):
+                identity = None
+            if identity:
                 attempts.pop(key, None)
                 lang = session.get("language")
                 session.clear()
                 session["language"] = lang
-                session["admin"] = True
+                session["linux_token"] = identity["token"]
+                session["username"] = identity["username"]
                 session["csrf"] = secrets.token_urlsafe(32)
                 session.permanent = True
                 return redirect("/")
@@ -111,6 +123,10 @@ def login():
 
 @app.post("/logout")
 def logout():
+    try:
+        call({"action": "linux_logout"})
+    except (OSError, ValueError):
+        pass
     session.clear()
     return redirect("/login")
 

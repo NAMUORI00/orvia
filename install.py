@@ -24,6 +24,7 @@ def preflight():
     missing = [
         x
         for x in [
+            "sudo",
             "docker",
             "nvidia-smi",
             "systemctl",
@@ -55,8 +56,9 @@ UMask=0077
 Restart=on-failure
 MemoryMax=1G
 CPUQuota=100%
-NoNewPrivileges=yes
+NoNewPrivileges=no
 ProtectSystem=full
+ReadWritePaths=/etc/h200-console /etc/systemd/system
 [Install]
 WantedBy=multi-user.target
 """
@@ -119,6 +121,21 @@ def tree_permissions():
                 p.chmod(0o755 if os.access(p, os.X_OK) else 0o644)
 
 
+def configure_linux_auth():
+    pam=pathlib.Path('/etc/pam.d/orvia')
+    if not pam.exists():
+        pam.write_text('@include common-auth\n@include common-account\n');pam.chmod(0o644)
+    settings=json.loads((ETC/'web.json').read_text())
+    settings.pop('username',None);settings.pop('password_hash',None)
+    settings['auth_backend']='linux_sudo'
+    (ETC/'web.json').write_text(json.dumps(settings))
+    dropin=UNITS/'h200-console-broker.service.d/linux-auth.conf'
+    dropin.parent.mkdir(parents=True,exist_ok=True)
+    dropin.write_text('[Service]\nNoNewPrivileges=no\n')
+    dropin.chmod(0o644)
+    cmd('systemctl','daemon-reload')
+
+
 def install():
     if os.geteuid() != 0:
         raise SystemExit("Run with sudo.")
@@ -128,12 +145,7 @@ def install():
             "Existing installation detected. Use: sudo python3 install.py --update"
         )
     print("\nOrvia setup — research containers stay unchanged\n")
-    username = input("Administrator ID [admin]: ").strip() or "admin"
-    if not re.fullmatch("[A-Za-z][A-Za-z0-9_-]{2,31}", username):
-        raise SystemExit("Invalid administrator ID.")
-    password = getpass.getpass("Administrator password (10+ characters): ")
-    if len(password) < 10 or password != getpass.getpass("Confirm password: "):
-        raise SystemExit("Passwords must match and contain at least 10 characters.")
+    print("Sign in with an existing host Linux sudo account; no separate administrator password is stored.")
     host = input("Listen IP [127.0.0.1]: ").strip() or "127.0.0.1"
     ipaddress.IPv4Address(host)
     if host == "0.0.0.0":
@@ -186,17 +198,13 @@ def install():
         SRC / "app", APP / "app", ignore=shutil.ignore_patterns("__pycache__")
     )
     dependencies()
-    salt = secrets.token_hex(16)
-    hashed = hashlib.pbkdf2_hmac(
-        "sha256", password.encode(), salt.encode(), 1000000
-    ).hex()
     (ETC / "web.json").write_text(
         json.dumps(
             dict(
-                username=username,
+                auth_backend="linux_sudo",
                 access_host=host,
                 secret=secrets.token_urlsafe(48),
-                password_hash=f"pbkdf2:sha256:1000000${salt}${hashed}",
+
             )
         )
     )
@@ -215,6 +223,7 @@ def install():
             )
         )
     )
+    configure_linux_auth()
     tree_permissions()
     broker, web = units(host, port)
     for name, content in [("broker", broker), ("web", web)]:
@@ -247,6 +256,7 @@ def update():
     cmd("systemctl", "stop", "h200-console-web.service", "h200-console-broker.service")
     (APP / "app").rename(backup)
     stage.rename(APP / "app")
+    configure_linux_auth()
     tree_permissions()
     cmd("systemctl", "start", "h200-console-broker.service", "h200-console-web.service")
     print("Updated. Previous application:", backup)

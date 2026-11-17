@@ -866,5 +866,8 @@
   "출력 계정": "Accounts to include",
   "선택한 계정만 문서에 포함됩니다. 실제 계정은 변경되지 않습니다.": "Only selected accounts appear in the document. Actual accounts remain unchanged.",
   "선택 미리보기": "Preview selection",
-  "출력할 계정을 한 개 이상 선택하세요.": "Select at least one account to include."
+  "출력할 계정을 한 개 이상 선택하세요.": "Select at least one account to include.",
+  "호스트 Linux 계정과 비밀번호로 로그인합니다. sudo 관리 권한이 필요합니다.": "Sign in with your host Linux account and password. Sudo administration privileges are required.",
+  "Linux 계정": "Linux account",
+  "실행 관리자": "Administrator"
 }
