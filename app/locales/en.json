@@ -738,5 +738,10 @@
   "연구실 공용 컨테이너 전환을 시작했습니다.": "Shared laboratory migration started.",
   "비밀번호를 변경했습니다. 내부 passwd와 동일하게 적용됩니다.": "Password updated. Container passwd and dashboard use the same account data.",
   "비밀번호 변경: 내부 passwd · 관리자 대시보드": "Password changes: container passwd or administrator dashboard",
-  "공용 컨테이너에 계정을 추가했습니다. 재시작 없이 접속할 수 있습니다.": "Account added to the shared container. Login is available without a restart."
+  "공용 컨테이너에 계정을 추가했습니다. 재시작 없이 접속할 수 있습니다.": "Account added to the shared container. Login is available without a restart.",
+  "공용 컨테이너 1개": "One laboratory container",
+  "개인 계정": "Individual accounts",
+  "연구실 저장공간": "Laboratory storage",
+  "전체 계정이 하나의 저장공간을 사용합니다. 개인별 용량 제한은 없으며, 일반 계정은 본인 홈 폴더만 접근할 수 있습니다.": "All accounts use one storage allocation. There are no individual quotas; standard users can access only their own home directory.",
+  "개인 홈": "Personal home"
 }

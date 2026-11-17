@@ -92,6 +92,7 @@ def catalog():
                 title=s["title"],
                 account_layout=s.get("account_layout", "separate"),
                 account_backend=s.get("account_backend", "bind_files"),
+                home_only=s.get('account_layout') == 'shared' and not s.get('shared_folder'),
                 users=users,
                 writable=key in c["write_labs"],
                 fingerprint=__import__("reconfigure").fingerprint(

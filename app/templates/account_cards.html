@@ -17,7 +17,7 @@
   <div class="person-body">
     <dl class="person-facts">
       <div><dt>학번</dt><dd>{{u.profile.student_id or 'N/A'}}</dd></div>
-      <div><dt>SSH 포트</dt><dd>{{u.port}}</dd></div>
+      <div><dt>SSH 포트</dt><dd>{{u.port}}</dd></div>{% if current.home_only %}<div><dt>개인 홈</dt><dd>/home/{{u.name}}</dd></div>{% endif %}
       <div><dt>이메일</dt><dd>{{u.profile.email or 'N/A'}}</dd></div>
       <div><dt>추가일자</dt><dd>{{u.profile.joined_on or 'N/A'}}</dd></div>
       <div><dt>이용 종료일</dt><dd>{{u.profile.expires_on or 'N/A'}}</dd></div>

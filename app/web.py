@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.7.3")
+    return jsonify(status="ok", version="0.7.4")
 
 
 @app.route("/login", methods=["GET", "POST"])

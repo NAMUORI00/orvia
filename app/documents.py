@@ -75,6 +75,21 @@ def compose(settings, data, lab, accounts, lang="ko", note=""):
             value=account_values([permissions.text(u.get("permissions"), lang) for u in accounts]),
         ),
     ]
+    if lab.get('home_only'):
+        storage = next(r for r in resources if r['id']=='storage')
+        storage['label'] = tr('연구실 저장공간','Laboratory storage')
+        amount = lab.get('allocated_gb')
+        capacity = (f'{amount / 1000:g} TB' if amount is not None else storage['value'])
+        storage['value'] = capacity + tr(' 전체 계정 공동 사용 · 개인별 용량 제한 없음',' total across accounts; no individual quota')
+        resources.insert(0,dict(id='layout',label=tr('사용 환경','Workspace'),value=tr('공용 컨테이너 1개 · 개인 계정으로 접속','One laboratory container; individual user accounts')))
+        resources.insert(5,dict(id='home',label=tr('개인 작업공간','Personal workspace'),value=tr('/home/본인ID · 일반 계정은 본인 폴더만 접근','/home/your-ID; standard users can access only their own home')))
+        admins = [u['name'] for u in accounts if u.get('permissions',{}).get('container_sudo')]
+        roles = tr('일반 계정: 개인 Python·Conda 환경에 패키지 설치','Standard accounts: install packages in personal Python/Conda environments')
+        if admins:
+            roles += '\n' + tr('관리자','Administrators') + ' (' + ', '.join(admins) + '): ' + tr('컨테이너 내부 sudo','sudo inside the container')
+        next(r for r in resources if r['id']=='permissions')['value'] = roles
+        if lab.get('account_backend') == 'native_etc':
+            resources.append(dict(id='password_change',label=tr('비밀번호 변경','Password change'),value=tr('passwd · 본인 비밀번호 변경','passwd - change your own password')))
     extras = profile.get("extra_fields", [])
     if not isinstance(extras, list) or len(extras) > 12:
         raise ValueError("안내서 추가 항목 설정을 확인하세요.")

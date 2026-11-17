@@ -161,3 +161,11 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - Dashboard backup/deletion removed both temporary accounts; their test homes and test backup artifacts were cleaned. All twelve existing accounts still authenticated using unchanged passwords. Stored original password hashes were compared and remained identical. Other research containers retained IDs/start times.
 - 109 unit tests passed. No post-change reboot persistence test was performed; persistence was verified by the shared host mount and observed account-file updates.
 - Data storage remains a 5,000,000,000,000-byte allocation (filesystem about 4.96 TB) at `/home` and `/shared`. The approximately 1.89 TB overlay at `/` is the server system filesystem and is distinct from the laboratory data allocation.
+
+
+## 0.7.4 personal-home storage display and access guides
+
+- Dashboard status exposes the laboratory account layout and whether a shared container uses personal homes without a common-folder mount. The Byun detail view shows one container, twelve accounts and the single 5,000 GB allocation; cards show each personal home.
+- Access guides derive the personal-home layout, allocated capacity, port, native password-change support and per-account administrator role from current laboratory data. Legacy laboratories retain their existing guide fields. No password values are included.
+- Korean and English guides were exported through the deployed authenticated dashboard, text-checked and visually reviewed on all two pages. They contain port 2208, 5 TB, personal home instructions and passwd, without a /shared reference.
+- 111 unit tests passed, including home-only guides and unchanged legacy guide behavior. The live dashboard showed the updated layout. Only dashboard services were restarted; research containers were not restarted or replaced.
