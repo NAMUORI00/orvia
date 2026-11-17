@@ -34,6 +34,7 @@
       add("대상 연구실", form.dataset.labTitle || fields.get("lab"));
     }
     if (form.dataset.impact) add("적용 방식", form.dataset.impact);
+    if (form.dataset.affectedAccounts) add("영향받는 계정", form.dataset.affectedAccounts);
 
     if (fields.get("scope") === "all") {
       add("적용 대상", "연구실 전체 계정");

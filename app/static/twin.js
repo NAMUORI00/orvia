@@ -106,6 +106,7 @@
   }
 
   function openCreate(gpuIdx = null) {
+    if (gpuIdx === null) { window.location.assign("/labs/add"); return; }
     mode = "create";
     activeLabId = null;
     popoverGpu = null;
@@ -416,7 +417,7 @@
     createCard.className = "lab-create-node";
     createCard.append(
       rawEl("span", "+", "lab-create-plus"),
-      el("strong", "연구실 생성"),
+      el("strong", "연구실 추가"),
       rawEl("span", t("미배정 GPU") + " " + freeCount + " " + t("사용 가능")),
     );
     createCard.addEventListener("click", () => openCreate(null));
@@ -762,8 +763,8 @@
     filesA.textContent = t("저장공간 분석") + " ›";
     const maintA = document.createElement("a");
     maintA.className = "split-nav-tile";
-    maintA.href = "/labs/" + encodeURIComponent(lab.id) + "/maintenance";
-    maintA.textContent = t("환경 관리") + " ›";
+    maintA.href = "/containers/" + encodeURIComponent(lab.id);
+    maintA.textContent = t("컨테이너 관리") + " ›";
     links.append(filesA, maintA);
     body.append(links);
   }
@@ -1364,12 +1365,12 @@
     const links = el("div", null, "split-links-row");
     const imgA = document.createElement("a");
     imgA.className = "split-nav-tile";
-    imgA.href = "/labs/" + encodeURIComponent(lab.id) + "/images";
+    imgA.href = "/containers/" + encodeURIComponent(lab.id) + "/images";
     imgA.textContent = t("환경 템플릿") + " ›";
     const mA = document.createElement("a");
     mA.className = "split-nav-tile";
-    mA.href = "/labs/" + encodeURIComponent(lab.id) + "/maintenance";
-    mA.textContent = t("환경 관리") + " ›";
+    mA.href = "/containers/" + encodeURIComponent(lab.id);
+    mA.textContent = t("컨테이너 관리") + " ›";
     links.append(imgA, mA);
     body.append(links);
   }
@@ -1381,7 +1382,7 @@
     const titleMeta = document.createElement("div");
     titleMeta.append(
       rawEl("span", "NEW LABORATORY", "host-eyebrow"),
-      el("h2", "연구실 생성"),
+      el("h2", "새 환경 만들기"),
     );
     titleBox.append(titleMeta);
 
@@ -1389,7 +1390,7 @@
     const wizardLink = document.createElement("a");
     wizardLink.className = "split-full-link";
     wizardLink.href =
-      createGpu !== null ? "/provision?gpu=" + encodeURIComponent(createGpu) : "/provision";
+      createGpu !== null ? "/labs/add/new?gpu=" + encodeURIComponent(createGpu) : "/labs/add/new";
     wizardLink.textContent = t("전체 마법사") + " ›";
     const closeBtn = rawEl("button", "✕", "split-close-btn");
     closeBtn.type = "button";

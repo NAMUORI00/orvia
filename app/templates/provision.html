@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
-{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><a href="/labs">연구실</a><span class="crumb-sep" aria-hidden="true">/</span><span>연구실 생성</span>{% endblock %}
+{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><a href="/labs">연구실</a><span class="crumb-sep" aria-hidden="true">/</span><a href="/labs/add">연구실 추가</a><span class="crumb-sep" aria-hidden="true">/</span><span>새 환경 만들기</span>{% endblock %}
 {% block content %}
-<a class="back-link" href="/labs">‹ 연구실</a>
-<h1>연구실 생성</h1>
+<a class="back-link" href="/labs/add">‹ 연구실 추가</a>
+<h1>연구실 추가</h1>
+{% include 'lab_add_tabs.html' %}
+<h2>새 환경 만들기</h2>
 <p>연구실 구성을 준비하고 확인 후 생성합니다.</p>
 <section class="card card-pad provision-wizard">
 <nav class="wizard-steps" aria-label="생성 단계"><span data-step-label="0">1 · 연구실·이미지</span><span data-step-label="1">2 · 자원 배정</span><span data-step-label="2">3 · 첫 사용자</span></nav>

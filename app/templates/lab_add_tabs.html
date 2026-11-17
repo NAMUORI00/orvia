@@ -1,0 +1,4 @@
+<nav class="section-pills" aria-label="연구실 추가 방식">
+  <a href="/labs/add/new" class="{{ 'active' if request.path.endswith('/new') else '' }}">새 환경 만들기</a>
+  <a href="/labs/add/existing" class="{{ 'active' if request.path.endswith('/existing') else '' }}">기존 환경 연결</a>
+</nav>

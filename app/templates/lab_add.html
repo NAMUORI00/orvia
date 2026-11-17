@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><span>연구실 추가</span>{% endblock %}
+{% block content %}
+<section class="page-head"><div><p class="eyebrow">ADD LABORATORY</p><h1>연구실 추가</h1><p>새 환경을 만들거나 이미 있는 환경을 연구실에 연결하세요.</p></div></section>
+<section class="labs-card-grid" aria-label="연구실 추가 방식">
+  <article class="lab-dir-card"><h2>새 환경 만들기</h2><p>이미지·GPU·저장공간·첫 계정을 설정해 새 연구실 환경을 만듭니다.</p><a class="button" href="/labs/add/new">새 환경 설정</a></article>
+  <article class="lab-dir-card"><h2>기존 환경 연결</h2><p>이미 있는 컨테이너를 연구실 관리 대상으로 연결합니다. 컨테이너를 새로 만들거나 재시작하지 않습니다.</p><a class="button secondary" href="/labs/add/existing">연결할 환경 선택</a></article>
+</section>
+<section class="card card-pad"><h2>이미 등록한 환경 관리</h2><p>등록된 환경의 상태·이름·재시작·개발환경 변경은 컨테이너 관리에서 확인하세요.</p><a href="/containers">컨테이너 관리 ›</a></section>
+{% endblock %}

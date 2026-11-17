@@ -1,0 +1,22 @@
+<section class="card card-pad"><h2>현재 이미지</h2><p>NVIDIA Driver {{data.gpus[0].driver if data.gpus else '—'}}</p>{% for u in current.users|unique(attribute="container") %}<p>{{u.name}} · {{u.image}}</p>{% endfor %}<p>공식 이미지를 준비하고 검증한 뒤 이 연구실의 사용자 환경을 교체합니다.</p></section>
+<form method="post" action="/hot-action" class="card card-pad" data-lab-title="{{lab.title}}" data-impact="개발환경 교체" data-affected-accounts="{{lab.users|map(attribute='name')|join(', ')}}" data-review="공식 이미지 준비 후 모든 사용자 환경을 재생성합니다. 저장된 자료와 계정은 유지되지만 기본 개발도구와 시스템 패키지는 새 이미지 구성으로 바뀝니다.">
+  <input type="hidden" name="csrf" value="{{session.csrf}}">
+  <input type="hidden" name="action" value="environment_apply">
+  <input type="hidden" name="lab" value="{{lab.id}}">
+  <input type="hidden" name="user" value="{{current.users[0].name if current.users else ''}}">
+  <input type="hidden" name="expected_fingerprint" value="{{current.fingerprint}}">
+  <h2>공식 환경 템플릿</h2>
+  <label for="image-provider">공급 이미지</label><select id="image-provider" name="image_provider"><option value="cuda">NVIDIA CUDA</option><option value="pytorch">NVIDIA PyTorch</option></select>
+  <label for="image-tag">공식 태그</label><select id="image-tag" name="image_tag" required></select>
+  <p id="catalog-status" role="status">공식 목록 조회 중</p>
+  <p>공급자 목록은 15분 동안 캐시합니다. 이미지별 GPU 아키텍처와 최소 드라이버 요구사항을 확인하세요.</p>
+  <fieldset id="permission-policy" class="permission-presets"><legend>권한 프로필</legend>{% for key,p in permission_profiles.items() %}<label><input type="radio" name="permission_profile" value="{{key}}" {% if (lab.root_access and key=='container_admin') or (not lab.root_access and key=='standard') %}checked{% endif %}><strong>{{p.label_ko}}</strong><span>{{p.description_ko}}</span></label>{% endfor %}</fieldset>
+  <p>두 프로필 모두 호스트 Docker 관리 권한을 제공하지 않습니다. 권한 프로필은 아래 개발환경 교체와 함께 연구실 전체에 적용됩니다.</p>
+  <p>저장 자료와 사용자 환경은 유지됩니다. 시스템에 설치된 패키지는 새 이미지 구성으로 교체됩니다.</p>
+  <label class="check-label"><input type="checkbox" name="ack_environment" value="yes" required> 기본 개발환경 교체 확인</label>
+  <label class="check-label"><input type="checkbox" name="ack_downtime" value="yes" required> 실행 작업 중단 확인</label>
+  <label class="check-label"><input type="checkbox" name="ack_recreate" value="yes" required> 연구실 환경 재생성 확인</label>
+  <label>연구실 ID 확인</label><input name="confirm" placeholder="{{lab.id}}" required>
+  <button {% if not lab.writable %}disabled{% endif %}>변경 검토</button>
+</form>
+<section class="card card-pad"><h2>개발환경 변경 기록</h2><div id="backup-jobs" data-lab="{{lab.id}}">{% for j in catalog.jobs if j.lab==lab.id and j.kind=='environment' %}<p>{{j.time}} · {{j.message}}</p>{% else %}<p>작업 없음</p>{% endfor %}</div></section>

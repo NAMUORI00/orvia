@@ -245,9 +245,51 @@ def labs_page():
     return render_template("labs.html", data=call({"action": "status"}))
 
 
+@app.get("/labs/add")
+def lab_add_page():
+    return render_template("lab_add.html")
+
+
+@app.get("/containers")
+def containers_page():
+    data = call({"action": "status"})
+    catalog = call({"action": "catalog"})
+    return render_template("containers.html", data=data, catalog=catalog, containers=container_rows(data, catalog))
+
+
+def container_rows(data, catalog):
+    details = {u["container"]: u for lab in catalog["labs"] for u in lab["users"]}
+    rows = {}
+    for lab in data["labs"]:
+        for user in lab["users"]:
+            key = (lab["id"], user["container"])
+            row = rows.setdefault(key, dict(lab_id=lab["id"], title=lab["title"],
+                name=user["container"], status=user["status"], writable=lab["writable"],
+                image=details.get(user["container"], {}).get("image", "—"), accounts=[]))
+            row["accounts"].append(user["name"])
+    return list(rows.values())
+
+
+@app.get("/containers/<lab_id>")
+@app.get("/containers/<lab_id>/<section>")
+def container_page(lab_id, section="maintenance"):
+    if section not in {"maintenance", "images"}:
+        abort(404)
+    data = call({"action": "status"})
+    catalog = call({"action": "catalog"})
+    lab = next((l for l in data["labs"] if l["id"] == lab_id), None)
+    current = next((l for l in catalog["labs"] if l["id"] == lab_id), None)
+    if lab is None or current is None:
+        abort(404)
+    return render_template("container_detail.html", data=data, catalog=catalog, lab=lab, current=current, section=section,
+        containers=[row for row in container_rows(data, catalog) if row["lab_id"] == lab_id])
+
+
 @app.get("/labs/<lab_id>")
 @app.get("/labs/<lab_id>/<section>")
 def lab_page(lab_id, section="overview"):
+    if section in {"maintenance", "images"}:
+        return redirect(url_for("container_page", lab_id=lab_id, section=section))
     titles = dict(
         overview="연구실 설정",
         accounts="계정",
@@ -303,8 +345,11 @@ def activity_page():
     )
 
 
+@app.route("/labs/add/new", methods=["GET", "POST"])
 @app.route("/provision", methods=["GET", "POST"])
 def provision_page():
+    if request.method == "GET" and request.path == "/provision":
+        return redirect("/labs/add/new" + ("?" + request.query_string.decode("utf-8") if request.query_string else ""))
     if request.method == "POST":
         try:
             result = call(
@@ -318,7 +363,7 @@ def provision_page():
             flash(result["message"], "success")
         except (ValueError, OSError) as exc:
             flash(str(exc), "error")
-        return redirect("/provision")
+        return redirect("/labs/add/new")
     data = call({"action": "status"})
     used = {i for l in data["labs"] for i in l.get("gpu_indices", [l["gpu"]])}
     requested_gpu = request.args.get("gpu", "")
@@ -373,7 +418,7 @@ def provision_prepare():
         flash(call(req)["message"], "success")
     except (ValueError, OSError) as e:
         flash(str(e), "error")
-    return redirect("/provision")
+    return redirect("/labs/add/new")
 
 
 @app.get("/api/provision")
@@ -465,11 +510,16 @@ def hot_action():
         "profile_save": "images",
         "environment_apply": "images",
     }.get(req["action"], "overview")
+    if target in {"maintenance", "images"}:
+        return redirect(url_for("container_page", lab_id=req.get("lab", ""), section=target))
     return redirect(url_for("lab_page", lab_id=req.get("lab", ""), section=target))
 
 
+@app.route("/labs/add/existing", methods=["GET", "POST"])
 @app.route("/register", methods=["GET", "POST"])
 def register_page():
+    if request.method == "GET" and request.path == "/register":
+        return redirect("/labs/add/existing")
     if request.method == "POST":
         req = {
             k: request.form.get(k)

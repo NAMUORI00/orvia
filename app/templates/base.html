@@ -12,9 +12,17 @@
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 11h3l2-5.5 3.5 9 2.5-5 1.5 1.5h2.5"/></svg>
       <span>운영 현황</span>
     </a>
-    <a href="/labs" class="{{ 'active' if request.path.startswith('/labs') or request.path.startswith('/provision') or request.path.startswith('/register') else '' }}">
+    <a href="/labs" class="{{ 'active' if request.path.startswith('/labs') and not request.path.startswith('/labs/add') else '' }}">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5 17 6.5 10 10.5 3 6.5Z"/><path d="M3 10.2 10 14.2 17 10.2"/><path d="M3 13.8 10 17.8 17 13.8"/></svg>
       <span>연구실</span>
+    </a>
+    <a href="/labs/add" class="{{ 'active' if request.path.startswith('/labs/add') else '' }}">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M10 6v8M6 10h8"/></svg>
+      <span>연구실 추가</span>
+    </a>
+    <a href="/containers" class="{{ 'active' if request.path.startswith('/containers') else '' }}">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round" aria-hidden="true"><path d="M10 2 17 6v8l-7 4-7-4V6ZM3 6l7 4 7-4M10 10v8"/></svg>
+      <span>컨테이너 관리</span>
     </a>
     <a href="/manual" class="{{ 'active' if request.path.startswith('/manual') else '' }}">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 3h7l3 3v11a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M12.5 3v3h3"/><path d="M7.5 9.5h5"/><path d="M7.5 13h5"/></svg>
