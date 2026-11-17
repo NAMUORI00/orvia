@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.7.1")
+    return jsonify(status="ok", version="0.7.2")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -402,7 +402,7 @@ def hot_action():
         "account_delete": "accounts",
         "lab_restart": "maintenance",
         "account_password": "accounts",
-        "lab_share": "accounts",
+        "lab_share": "maintenance",
         "gpu_reconfigure": "gpu",
         "maintenance_restart": "maintenance",
         "maintenance_recreate": "maintenance",

@@ -165,7 +165,7 @@ def dispatch(req):
         return __import__("shared_accounts").password(req)
 
     if req.get("action") == "lab_share":
-        return __import__("shared_migration").apply(req)
+        return __import__("merge_migration").submit(req)
 
     if req.get("action") == "environment_apply":
         return __import__("environments").submit(req)

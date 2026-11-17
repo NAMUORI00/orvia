@@ -141,3 +141,13 @@ No production account changes, GPU resets, Docker restarts or host reboots were 
 - The retained rollback container and credential/configuration backups are intentional recovery assets. Newly created laboratory provisioning was covered by automated tests, not another live research-lab creation in this change.
 
 - Automated validation: 101 unit tests passed; Korean and English account views verified in the browser after deployment.
+
+
+## 0.7.2 shared-container consolidation
+
+- Environment management provides an explicit per-laboratory shared-container conversion with a selected common SSH port. It checks current container identity, GPU activity, user/extra root processes, private home permissions, identical immutable images, compatible resource/security settings, environment variables, mounts, and account database conflicts.
+- Compatible laboratories can be converted after notifying members. Different system images or resource policies are deliberately rejected until aligned; this is not a package-merging mechanism. New-laboratory defaults are unchanged.
+- The worker merges account records without changing password hashes or UIDs, keeps personal home paths and common data, retains stopped originals, updates only the selected laboratory, and registers mount-first recovery for the shared container. Failed operations attempt to restore prior containers and configuration.
+- 2026-11-17: Byun laboratory converted through the dashboard. All 11 existing accounts passed actual SSH password login on port 2208. Python 3.10.22, Conda 26.7.2, GPUs 3 and 4, writable home/common directories, peer-home permission denial, protected account databases, protected admin directory, and absence of Docker socket were verified.
+- Password hashes, UID ownership, and home modes were compared with pre-conversion settings. Other laboratories' seven containers retained their IDs and start timestamps. They were not restarted or modified. Stopped Byun originals remain for recovery.
+- 106 unit tests passed, including credential preservation, account conflicts, duplicate UID rejection, and missing-password rejection. No destructive account-management test, GPU workload, or server reboot was performed on production.

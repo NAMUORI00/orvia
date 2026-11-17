@@ -656,7 +656,7 @@
   "최근 수집": "Latest sample",
   "컨테이너 구성": "Container layout",
   "현재 계정별 컨테이너입니다. 공용 구조 전환 후 계정을 추가할 수 있습니다.": "This lab currently uses separate containers. Convert to a shared container before adding accounts.",
-  "연구실 공용 컨테이너 전환": "Shared laboratory container conversion",
+  "연구실 공용 컨테이너 전환": "Shared laboratory container",
   "접속·실행 작업 종료 확인": "Confirm session and process interruption",
   "공용 컨테이너 전환 확인": "Confirm shared container conversion",
   "공용 구조 전환 검토": "Review shared container conversion",
@@ -726,5 +726,14 @@
   "사용자별 컨테이너 전환 완료 · 개인 자료와 비밀번호 유지": "Container separation complete; personal files and passwords preserved",
   "사용자별 컨테이너 전환을 시작했습니다. 개인 파일과 비밀번호는 유지됩니다.": "Container separation started. Personal files and passwords are preserved.",
   "모든 계정 동일 설정": "Same settings for all accounts",
-  "계정별 한도 설정": "Individual account limits"
+  "계정별 한도 설정": "Individual account limits",
+  "개인 컨테이너를 하나의 연구실 환경으로 통합합니다. 계정과 개인 자료는 유지하며 선택한 계정의 SSH 포트를 공용으로 사용합니다.": "Merge personal containers into one laboratory environment. Preserve accounts and personal files, using the selected SSH port for everyone.",
+  "구성원 공지 후 실행하세요. GPU 작업이나 사용자 프로세스가 있으면 중단합니다. 서로 다른 이미지·자원 한도는 환경 통일 후 전환할 수 있습니다.": "Notify members before applying. Active GPU jobs or user processes block migration. Different images or resource limits must be aligned first.",
+  "선택한 연구실의 모든 접속 포트가 하나로 통합됩니다. 계정·비밀번호·개인 파일은 유지하고 기존 컨테이너는 정지 상태로 보관합니다. 다른 연구실은 변경하지 않습니다.": "All accounts in this laboratory will use one SSH port. Accounts, passwords and personal files are preserved. Previous containers remain stopped for recovery. Other laboratories are unchanged.",
+  "공용 접속 포트": "Shared SSH port",
+  "공용 환경과 접속 포트 통합 확인": "Confirm shared environment and SSH port",
+  "공용 전환 검토": "Review shared environment",
+  "공용 환경 준비 중": "Preparing shared environment",
+  "공용 컨테이너 전환 완료": "Shared container migration complete",
+  "연구실 공용 컨테이너 전환을 시작했습니다.": "Shared laboratory migration started."
 }
