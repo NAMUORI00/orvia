@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orvia · GPU Workspace</title><link rel="icon" type="image/svg+xml" href="/static/models/brand-mark.svg"><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/console.css"><link rel="stylesheet" href="/static/twin.css"><link rel="stylesheet" href="/static/insights.css"><link rel="stylesheet" href="/static/accounts.css"></head>
-<body class="{% if not session.admin %}unauth{% endif %}">
-{% if session.admin %}<aside class="sidebar">
+<body class="{% if not session.linux_token %}unauth{% endif %}">
+{% if session.linux_token %}<aside class="sidebar">
   <a class="brand" href="/"><img class="brand-logo" src="/static/models/brand-mark.svg" alt=""><span>Orvia</span></a>
   <div class="side-label">WORKSPACE CONSOLE</div>
   <nav class="nav" aria-label="주 메뉴">
@@ -41,8 +41,8 @@
       <div class="lang-switch" role="group" aria-label="언어 선택">
         {% for code,label in languages.items() %}<a class="language-link {{ 'active' if code == current_language else '' }}" data-lang-code="{{code}}" href="/language?lang={{code}}&amp;next={{request.full_path|urlencode}}">{{label}}</a>{% endfor %}
       </div>
-      {% if session.admin %}
-        <span class="admin-pill"><span class="avatar">A</span><strong>관리자</strong></span>
+      {% if session.linux_token %}
+        <span class="admin-pill"><span class="avatar">A</span><strong>{{session.get("username", "관리자")}}</strong></span>
         <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{session.csrf}}"><button class="secondary btn-sm">로그아웃</button></form>
       {% else %}
         <strong>Orvia</strong>

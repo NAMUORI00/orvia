@@ -48,6 +48,8 @@ def authorize(c, action, lab, user=None):
 
 
 def audit(action, lab, user, result):
+    import syslog
+    syslog.syslog(syslog.LOG_NOTICE, "orvia " + json.dumps(dict(actor=os.environ.get("SUDO_USER", "system"), actor_uid=os.environ.get("SUDO_UID"), action=action, lab=lab, target_user=user, result=result)))
     STATE.mkdir(exist_ok=True)
     with (STATE / "audit.jsonl").open("a") as f:
         f.write(
@@ -58,6 +60,8 @@ def audit(action, lab, user, result):
                     lab=lab,
                     user=user,
                     result=result,
+                    actor=os.environ.get("SUDO_USER", "system"),
+                    actor_uid=os.environ.get("SUDO_UID"),
                 ),
                 ensure_ascii=False,
             )
@@ -332,109 +336,115 @@ def operate(req):
     return {"message": "작업이 완료되었습니다."}
 
 
+def process_request(req):
+    try:
+        with LOCK:
+            if req.get("action") == "status":
+                result = snapshot()
+            elif req.get("action") == "telemetry":
+                result = __import__("telemetry").latest_lab(req["usage_lab"]) if req.get("usage_lab") else __import__("telemetry").read(
+                    req.get("hours", 2), req.get("start"), req.get("end")
+                )
+            elif req.get("action") == "provision_sources":
+                result = __import__("lifecycle").sources()
+            elif req.get("action") == "telemetry_retention":
+                result = __import__("telemetry").retention(req.get("values"))
+            elif req.get("action") == "storage_usage":
+                result = __import__("storage_usage").get(req)
+            elif req.get("action") == "files":
+                import filebrowser
+
+                result = filebrowser.inspect(req)
+            elif req.get("action") == "catalog":
+                import hotops
+
+                result = hotops.catalog()
+            elif req.get("action") in {
+                "provision_plans",
+                "provision_submit",
+                "provision_prepare",
+            }:
+                import lifecycle
+
+                result = (
+                    lifecycle.plans()
+                    if req["action"] == "provision_plans"
+                    else lifecycle.prepare(req)
+                    if req["action"] == "provision_prepare"
+                    else lifecycle.submit(req)
+                )
+                CACHE.clear()
+            elif req.get("action") in {
+                "metadata",
+                "container_rename",
+                "account_metadata",
+                "account_create",
+                "lab_separate",
+                "account_backup",
+                "account_delete",
+                "lab_restart",
+                "account_password",
+                "lab_share",
+                "environment_apply",
+                "gpu_reconfigure",
+                "maintenance_restart",
+                "maintenance_recreate",
+                "resources",
+                "backup",
+                "adduser",
+                "profile_save",
+                "register",
+            }:
+                import hotops
+
+                result = hotops.dispatch(req)
+            else:
+                result = operate(req)
+        if req.get("action") not in {
+            "status",
+            "catalog",
+            "provision_sources",
+            "telemetry",
+            "storage_usage",
+            "files",
+        }:
+            audit(req.get("action"), req.get("lab"), req.get("user"), "ok")
+        response = {"ok": True, "data": result}
+    except Exception as e:
+        if req.get("action") not in {
+            "status",
+            "catalog",
+            "provision_sources",
+            "telemetry",
+            "storage_usage",
+            "files",
+        }:
+            audit(
+                req.get("action"),
+                req.get("lab"),
+                req.get("user"),
+                "denied" if isinstance(e, PermissionError) else "failed",
+            )
+        response = {
+            "ok": False,
+            "error": str(e)
+            if isinstance(e, (PermissionError, ValueError, AssertionError))
+            else "관리 작업 실패. 서버 로그를 확인하세요.",
+        }
+    return response
+
+
 class Handler(socketserver.StreamRequestHandler):
     def handle(self):
-        req = {}
         try:
-            self.connection.settimeout(10)
+            self.connection.settimeout(150)
             raw = self.rfile.readline(8193)
-            if len(raw) > 8192:
-                raise ValueError("Request too large")
-            req = json.loads(raw)
-            with LOCK:
-                if req.get("action") == "status":
-                    result = snapshot()
-                elif req.get("action") == "telemetry":
-                    result = __import__("telemetry").latest_lab(req["usage_lab"]) if req.get("usage_lab") else __import__("telemetry").read(
-                        req.get("hours", 2), req.get("start"), req.get("end")
-                    )
-                elif req.get("action") == "provision_sources":
-                    result = __import__("lifecycle").sources()
-                elif req.get("action") == "telemetry_retention":
-                    result = __import__("telemetry").retention(req.get("values"))
-                elif req.get("action") == "storage_usage":
-                    result = __import__("storage_usage").get(req)
-                elif req.get("action") == "files":
-                    import filebrowser
-
-                    result = filebrowser.inspect(req)
-                elif req.get("action") == "catalog":
-                    import hotops
-
-                    result = hotops.catalog()
-                elif req.get("action") in {
-                    "provision_plans",
-                    "provision_submit",
-                    "provision_prepare",
-                }:
-                    import lifecycle
-
-                    result = (
-                        lifecycle.plans()
-                        if req["action"] == "provision_plans"
-                        else lifecycle.prepare(req)
-                        if req["action"] == "provision_prepare"
-                        else lifecycle.submit(req)
-                    )
-                    CACHE.clear()
-                elif req.get("action") in {
-                    "metadata",
-                    "container_rename",
-                    "account_metadata",
-                    "account_create",
-                    "lab_separate",
-                    "account_backup",
-                    "account_delete",
-                    "lab_restart",
-                    "account_password",
-                    "lab_share",
-                    "environment_apply",
-                    "gpu_reconfigure",
-                    "maintenance_restart",
-                    "maintenance_recreate",
-                    "resources",
-                    "backup",
-                    "adduser",
-                    "profile_save",
-                    "register",
-                }:
-                    import hotops
-
-                    result = hotops.dispatch(req)
-                else:
-                    result = operate(req)
-            if req.get("action") not in {
-                "status",
-                "catalog",
-                "provision_sources",
-                "telemetry",
-                "storage_usage",
-                "files",
-            }:
-                audit(req.get("action"), req.get("lab"), req.get("user"), "ok")
-            response = {"ok": True, "data": result}
-        except Exception as e:
-            if req.get("action") not in {
-                "status",
-                "catalog",
-                "provision_sources",
-                "telemetry",
-                "storage_usage",
-                "files",
-            }:
-                audit(
-                    req.get("action"),
-                    req.get("lab"),
-                    req.get("user"),
-                    "denied" if isinstance(e, PermissionError) else "failed",
-                )
-            response = {
-                "ok": False,
-                "error": str(e)
-                if isinstance(e, (PermissionError, ValueError, AssertionError))
-                else "관리 작업 실패. 서버 로그를 확인하세요.",
-            }
-        self.wfile.write((json.dumps(response, ensure_ascii=False) + "\n").encode())
+            if len(raw)>8192: raise ValueError("Request too large")
+            import linux_auth
+            response = linux_auth.handle(json.loads(raw))
+        except Exception:
+            response = {"ok": False, "error": "Linux 계정 인증 또는 관리 요청을 확인하세요."}
+        self.wfile.write((json.dumps(response, ensure_ascii=False)+"\n").encode())
 
 
 if __name__ == "__main__":

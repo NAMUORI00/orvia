@@ -1,6 +1,10 @@
 """Presentation metadata only; unknown actions retain their original identifier."""
 
 ACTIONS = {
+    "linux_login": ("person", "Linux 로그인"),
+    "linux_logout": ("person", "로그아웃"),
+    "identity_check": ("person", "실행 권한 확인"),
+    "container_rename": ("box", "컨테이너 이름 변경"),
     "files": ("disk", "파일 조회"),
     "provision_plans": ("lab", "생성 계획 조회"),
     "create": ("lab", "환경 생성"),
@@ -33,6 +37,10 @@ ACTIONS = {
     "storage_grow": ("disk", "저장공간 확장"),
 }
 ICONS = {
+    "key": "🔑",
+    "power": "↻",
+    "archive": "▤",
+    "settings": "⚙",
     "person": "♙",
     "lab": "▦",
     "chip": "▥",
@@ -62,9 +70,10 @@ def events(data):
                 time=e.get("time", "N/A"),
                 lab=names.get(e.get("lab"), e.get("lab") or "서버"),
                 user=e.get("user") or "전체",
+                actor=e.get("actor") or "N/A",
                 code=e.get("action", "N/A"),
                 label=label,
-                icon=ICONS[kind],
+                icon=ICONS.get(kind, ICONS["other"]),
                 state=status,
                 read=e.get("action") in {"files", "provision_plans"},
                 label_result=("요청 접수" if e.get("action") in ASYNC else "처리 완료")

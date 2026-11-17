@@ -4,7 +4,7 @@
 
 - `h200-console-web.service`: administrator UI, dedicated non-login user.
 - `h200-console-broker.service`: bounded host operations.
-- `/etc/h200-console/web.json`: administrator hash, session secret, optional guide defaults.
+- `/etc/h200-console/web.json`: session secret, Linux authentication mode, optional guide defaults.
 - `/etc/h200-console/policy.json`: lab definitions, GPU/lab mutation allowlists, backup directory.
 - `/var/lib/h200-console/audit.jsonl`: operation outcome metadata, never request bodies/passwords.
 - `/var/lib/h200-console/jobs`: backup job outcomes.
@@ -24,7 +24,7 @@ These are live best-effort backups, not memory checkpoints or transaction-consis
 
 ## Network and administrator authentication
 
-The dashboard uses its own administrator hash; it is not PAM/LDAP/Linux-group SSO. Use an SSH tunnel or a TLS reverse proxy when transport encryption is required. Configure exact trusted hostnames via `H200_TRUSTED_HOSTS`; do not use a wildcard.
+The dashboard uses host Linux PAM authentication and the actual sudo policy. It does not maintain an administrator password hash. Management workers are launched by sudo under the authenticated account; audit records identify the administrator. See [Linux authentication](LINUX-AUTH.md). Use an SSH tunnel or a TLS reverse proxy when transport encryption is required. Configure exact trusted hostnames via `H200_TRUSTED_HOSTS`; do not use a wildcard.
 
 ## Known limitations
 
