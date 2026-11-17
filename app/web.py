@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.7.5")
+    return jsonify(status="ok", version="0.7.6")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -238,9 +238,9 @@ def lab_page(lab_id, section="overview"):
         resources="자원 배정",
         limits="CPU·메모리 점유율",
         gpu="GPU",
-        storage="공유 저장공간",
+        storage="연구실 디스크",
         images="환경 템플릿",
-        backups="백업",
+        backups="백업 · 안내서",
         maintenance="환경 관리",
         files="저장공간 분석",
     )
@@ -271,6 +271,7 @@ def lab_page(lab_id, section="overview"):
         section=section,
         titles=titles,
         storage_limit=catalog["storage_limit"],
+        selected_accounts=[u["name"] for u in lab["users"]],
     )
 
 

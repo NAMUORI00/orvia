@@ -1,106 +1,351 @@
 {% extends 'base.html' %}
 {% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><a href="/labs">연구실</a><span class="crumb-sep" aria-hidden="true">/</span><span>{{lab.title}}</span>{% endblock %}
 {% block content %}
+{% set ns = namespace(assigned=[], total_vram=0.0, free_vram=0.0, free_gpus=0, lab_vram_used=0.0, lab_vram_total=0.0, lab_util_sum=0.0, lab_gpu_cnt=0, lab_temp=0) %}
+{% for item in data.labs %}{% for idx in (item.gpu_indices or [item.gpu]) %}{% if idx is not none and idx not in ns.assigned %}{% set ns.assigned = ns.assigned + [idx] %}{% endif %}{% endfor %}{% endfor %}
+{% set lab_idxs = lab.gpu_indices or [lab.gpu] %}
+{% for g in data.gpus %}
+  {% set ns.total_vram = ns.total_vram + (g.total / 1024.0) %}
+  {% if g.index not in ns.assigned %}
+    {% set ns.free_gpus = ns.free_gpus + 1 %}
+    {% set ns.free_vram = ns.free_vram + (g.total / 1024.0) %}
+  {% endif %}
+  {% if g.index in lab_idxs %}
+    {% set ns.lab_gpu_cnt = ns.lab_gpu_cnt + 1 %}
+    {% set ns.lab_util_sum = ns.lab_util_sum + g.util %}
+    {% set ns.lab_vram_used = ns.lab_vram_used + (g.used / 1024.0) %}
+    {% set ns.lab_vram_total = ns.lab_vram_total + (g.total / 1024.0) %}
+    {% if g.temp > ns.lab_temp %}{% set ns.lab_temp = g.temp %}{% endif %}
+  {% endif %}
+{% endfor %}
+{% set hs = data.get('host_storage') or {} %}
+{% set free_cpu_est = data.cpu_count %}
+{% set free_ram_gib = [0, (data.memory_total_gib or 0) - (data.memory_used_gib or 0)]|max %}
+{% set lab_gpu_avg = (ns.lab_util_sum / ns.lab_gpu_cnt) if ns.lab_gpu_cnt else 0 %}
+{% set lab_vram_pct = ((ns.lab_vram_used / ns.lab_vram_total) * 100) if ns.lab_vram_total > 0 else 0 %}
+{% set lab_disk_pct = ((lab.used_gb / lab.storage_gb) * 100) if lab.storage_gb > 0 else 0 %}
+{% set lab_disk_free = [0, (lab.storage_gb or 0) - (lab.used_gb or 0)]|max %}
+
 <a class="back-link" href="{{ '/labs' if section=='overview' else '/labs/'+lab.id }}">‹ {{ '연구실' if section=='overview' else lab.title }}</a>
 <section class="page-head">
   <div>
-    <p class="eyebrow">{{lab.id}}</p>
+    <div class="cockpit-head-meta">
+      <span class="lab-id-pill">{{lab.id}}</span>
+      <span class="sig-badge {{'sig-safe' if lab.writable else 'sig-idle'}}">{{ '편집 허용' if lab.writable else '조회 전용' }}</span>
+      {% if current.users %}
+      <span class="sig-badge sig-idle">{{current.users[0].container}}</span>
+      {% endif %}
+    </div>
     <h1>{{lab.title}}</h1>
     <p>{{ titles[section] }}</p>
   </div>
   <div class="twin-head-actions">
-    <span class="badge {{'running' if lab.writable else ''}}">{{ '편집 허용' if lab.writable else '조회 전용' }}</span>
     <a class="button secondary btn-sm" href="/?lab={{lab.id}}">배치도에서 열기</a>
+    <a class="button btn-sm" href="/manual?lab={{lab.id}}">이용 안내서</a>
   </div>
 </section>
 
-<nav class="lab-subnav" aria-label="연구실 메뉴">
-  <a href="/labs/{{lab.id}}" class="{{ 'active' if section=='overview' else '' }}">개요</a>
-  <a href="/labs/{{lab.id}}/accounts" class="{{ 'active' if section=='accounts' else '' }}">계정</a>
-  <a href="/labs/{{lab.id}}/gpu" class="{{ 'active' if section=='gpu' else '' }}">GPU</a>
-  <a href="/labs/{{lab.id}}/limits" class="{{ 'active' if section=='limits' else '' }}">CPU·메모리</a>
-  <a href="/labs/{{lab.id}}/storage" class="{{ 'active' if section=='storage' else '' }}">{{ '연구실 저장공간' if current.home_only else '공유 저장공간' }}</a>
-  <a href="/labs/{{lab.id}}/files" class="{{ 'active' if section=='files' else '' }}">저장공간 분석</a>
-  <a href="/labs/{{lab.id}}/images" class="{{ 'active' if section=='images' else '' }}">환경 템플릿</a>
-  <a href="/labs/{{lab.id}}/backups" class="{{ 'active' if section=='backups' else '' }}">백업</a>
-  <a href="/labs/{{lab.id}}/maintenance" class="{{ 'active' if section=='maintenance' else '' }}">환경 관리</a>
+<!-- Host Allocatable Headroom Strip -->
+<section class="host-headroom-strip" aria-label="서버 가용 자원 여유">
+  <div class="headroom-cell">
+    <span>서버 여유 GPU</span>
+    <strong>{{ns.free_gpus}} / {{data.gpus|length}} <small>({{"%.0f"|format(ns.free_vram)}} GB 미배정 할당 가능)</small></strong>
+  </div>
+  <div class="headroom-cell">
+    <span>서버 CPU</span>
+    <strong>{{data.cpu_count}} <span>코어</span> <small data-host-free-cpu>—</small></strong>
+  </div>
+  <div class="headroom-cell">
+    <span>서버 여유 RAM</span>
+    <strong>{{"%.0f"|format(free_ram_gib)}} / {{data.memory_total_gib}} GiB <small>({{"%.1f"|format((free_ram_gib / data.memory_total_gib * 100) if data.memory_total_gib else 0)}}%)</small></strong>
+  </div>
+  <div class="headroom-cell">
+    <span>서버 여유 디스크</span>
+    <strong>{{ hs.free_gb if hs else '—' }} / {{ hs.total_gb if hs else '—' }} GB <small>증설 가능</small></strong>
+  </div>
+</section>
+
+<!-- Simplified 5-Tab Primary Navigation -->
+<nav class="cockpit-subnav" aria-label="연구실 메뉴">
+  <a href="/labs/{{lab.id}}" class="{{ 'active' if section=='overview' else '' }}">계기판 개요</a>
+  <a href="/labs/{{lab.id}}/accounts" class="{{ 'active' if section=='accounts' else '' }}">구성원 · 접속 ({{lab.users|length}})</a>
+  <a href="/labs/{{lab.id}}/limits" class="{{ 'active' if section in ['resources','limits','gpu','storage','files'] else '' }}">자원 조절</a>
+  <a href="/labs/{{lab.id}}/maintenance" class="{{ 'active' if section in ['maintenance','images'] else '' }}">환경 · 관리</a>
+  <a href="/labs/{{lab.id}}/backups" class="{{ 'active' if section=='backups' else '' }}">백업 · 안내서</a>
 </nav>
 
-{% if section in ['overview','limits'] %}{% include 'lab_usage.html' %}{% endif %}
+{% if section in ['resources','limits','gpu','storage','files'] %}
+<nav class="section-pills" aria-label="자원 상세 메뉴">
+  <a href="/labs/{{lab.id}}/limits" class="{{ 'active' if section in ['resources','limits'] else '' }}">CPU·메모리 한도</a>
+  <a href="/labs/{{lab.id}}/gpu" class="{{ 'active' if section=='gpu' else '' }}">GPU 배정</a>
+  <a href="/labs/{{lab.id}}/storage" class="{{ 'active' if section=='storage' else '' }}">디스크 증설</a>
+  <a href="/labs/{{lab.id}}/files" class="{{ 'active' if section=='files' else '' }}">폴더별 용량 분석</a>
+</nav>
+{% elif section in ['maintenance','images'] %}
+<nav class="section-pills" aria-label="환경 관리 메뉴">
+  <a href="/labs/{{lab.id}}/maintenance" class="{{ 'active' if section=='maintenance' else '' }}">컨테이너 · 복구 관리</a>
+  <a href="/labs/{{lab.id}}/images" class="{{ 'active' if section=='images' else '' }}">공식 이미지 · 권한</a>
+</nav>
+{% endif %}
+
+{% if section in ['limits'] %}{% include 'lab_usage.html' %}{% endif %}
 {% if section in ['gpu','storage'] %}{% include 'lab_configuration.html' %}{% endif %}
 
 {% if section=='overview' %}
-<section class="lab-visual-overview">
-  <div class="lab-scene">
-    <img src="/static/models/laboratory.svg" alt="">
-    <h2>{{lab.title}}</h2>
-    <span>{{lab.users|length}} · 사용자</span>
-    <div class="lab-scene-links">
-      <a href="/labs/{{lab.id}}/accounts">사용자 관리 ›</a>
-      <a href="/labs/{{lab.id}}/maintenance">환경 관리 ›</a>
-      <a href="/manual?lab={{lab.id}}">이용 안내서 ›</a>
-    </div>
-  </div>
-  <div class="allocation-grid">
-    <a class="allocation-card" href="/labs/{{lab.id}}/gpu">
-      <svg class="resource-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/><path d="M8 6V4m4 2V4m4 2V4"/></svg>
-      <h3>GPU</h3>
-      <div class="gpu-slots">{% for g in data.gpus %}<span class="{{'allocated' if g.index in (lab.gpu_indices or [lab.gpu]) else ''}}">{{g.index}}</span>{% endfor %}</div>
-      <strong>{{(lab.gpu_indices or [lab.gpu])|length}} · 배정 GPU</strong>
-      <small>GPU 상세 ›</small>
-    </a>
-    <a class="allocation-card" href="/labs/{{lab.id}}/limits">
-      <svg class="resource-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3m6-3v3M9 20v3m6-3v3M20 9h3m-3 6h3M1 9h3m-3 6h3"/></svg>
-      <h3>CPU · 메모리</h3>
-      {% if current.users and current.users|map(attribute='cpu')|unique|list|length == 1 and current.users|map(attribute='ram')|unique|list|length == 1 %}{% set u=current.users[0] %}
-      <div class="allocation-user"><b>{{ '연구실 전체' if current.account_layout=='shared' else '모든 계정 동일 설정' }}</b><span>CPU {{u.cpu or '제한 없음'}}{% if u.cpu %} cores{% endif %} · RAM {{u.ram or '제한 없음'}}{% if u.ram %} GiB{% endif %}</span></div>
-      {% else %}<p>계정별 한도 설정</p>{% endif %}
-      <small>할당 조절 ›</small>
-    </a>
-    <a class="allocation-card storage-visual" href="/labs/{{lab.id}}/storage">
-      <svg class="resource-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
-      <h3>{{ '연구실 저장공간' if current.home_only else '공유 저장공간' }}</h3>
-      <strong>{{lab.used_gb}} / {{lab.storage_gb}} GB</strong>
-      <progress value="{{lab.used_gb}}" max="{{lab.storage_gb}}" aria-label="저장공간 사용량"></progress>
-      <small>용량 관리 ›</small>
-    </a>
-    <div class="allocation-card">
-      <h3>서버 저장 경로</h3>
-      <code class="host-storage-path">{{lab.storage_path}}</code>
-      <p class="muted">서버 관리자 SSH · SFTP 접속 기준</p>
-      <a href="/labs/{{lab.id}}/files" class="button secondary">저장공간 분석 ›</a>
-    </div>
-  </div>
-</section>
+<div class="lab-usage" data-usage-lab="{{lab.id}}" data-shared-layout="{{ 'yes' if current.account_layout=='shared' else 'no' }}">
+  <!-- Row 1: 4-Dial Instrument Cluster (GPU/VRAM, CPU, Memory, Lab Disk) -->
+  <section class="cockpit-dial-grid" aria-label="연구실 4대 자원 계기판">
+    <!-- 1. GPU & VRAM Dial -->
+    <article class="cockpit-card">
+      <div class="cockpit-card-head">
+        <h2>GPU 연산 · VRAM</h2>
+        <span class="sig-badge {{ 'sig-warn' if lab_gpu_avg >= 70 else 'sig-info' if lab_gpu_avg >= 25 else 'sig-safe' }}">{{ '주의' if lab_gpu_avg >= 70 else '활발' if lab_gpu_avg >= 25 else '쾌적' if lab_gpu_avg >= 5 else '여유' }}</span>
+      </div>
+      {% set gpu_vis = 2.2 if lab_gpu_avg > 0 and lab_gpu_avg < 2.2 else lab_gpu_avg %}
+      {% set vram_vis = 2.2 if lab_vram_pct > 0 and lab_vram_pct < 2.2 else lab_vram_pct %}
+      <svg class="cockpit-gauge-svg" viewBox="0 0 180 148" role="img" aria-label="GPU 연산 및 VRAM 사용률">
+        <text class="gauge-scale-tick" x="34" y="139" text-anchor="middle">0</text>
+        <text class="gauge-scale-tick" x="90" y="11" text-anchor="middle">50</text>
+        <text class="gauge-scale-tick" x="146" y="139" text-anchor="middle">100</text>
+        <path class="gauge-track" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100"/>
+        {% if gpu_vis > 0 %}
+        <path class="gauge-arc {{ 'is-amber' if lab_gpu_avg >= 70 else 'is-sky' if lab_gpu_avg >= 25 else 'is-teal' }}" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100" stroke-dasharray="{{"%.1f"|format(gpu_vis)}} 100"/>
+        {% endif %}
+        <path class="gauge-track-inner" d="M 54.6 115.4 A 50 50 0 1 1 125.4 115.4" pathLength="100"/>
+        {% if vram_vis > 0 %}
+        <path class="gauge-arc-inner {{ 'is-warn' if lab_vram_pct >= 80 else '' }}" d="M 54.6 115.4 A 50 50 0 1 1 125.4 115.4" pathLength="100" stroke-dasharray="{{"%.1f"|format(vram_vis)}} 100"/>
+        {% endif %}
+        <text class="gauge-center-val" x="90" y="79" text-anchor="middle">{{"%.0f"|format(lab_gpu_avg)}}%</text>
+        <text class="gauge-center-sub" x="90" y="96" text-anchor="middle">GPU 부하</text>
+      </svg>
+      <div class="cockpit-dial-figures">
+        <strong>VRAM {{"%.1f"|format(ns.lab_vram_used)}} / {{"%.0f"|format(ns.lab_vram_total)}} GB</strong>
+        <small>GPU {{lab_idxs|join(', ')}} · {{ns.lab_temp}} °C</small>
+      </div>
+      <div class="cockpit-card-foot">
+        <div class="cockpit-gpu-bays">{% for g in data.gpus %}<span class="bay-chip {{'owned' if g.index in lab_idxs else ''}}">{{g.index}}</span>{% endfor %}</div>
+        <div class="cockpit-card-link-row">
+          <span>배정 {{ns.lab_gpu_cnt}} / {{data.gpus|length}}</span>
+          <a href="/labs/{{lab.id}}/gpu">GPU 배정 변경 ›</a>
+        </div>
+      </div>
+    </article>
 
-<section class="card card-pad">
-  <h2>접근 및 저장 격리 구조</h2>
-  <div class="iso-summary-grid">
-    <div class="iso-row">
-      <div><strong>배정 GPU 공동 사용</strong><span>할당된 GPU만 컨테이너에 연결</span></div>
-      <span class="iso-pill">GPU {{(lab.gpu_indices or [lab.gpu])|join(', ')}}</span>
+    <!-- 2. CPU Dial -->
+    <article class="cockpit-card">
+      <div class="cockpit-card-head">
+        <h2>CPU 프로세서</h2>
+        <span class="sig-badge sig-safe" data-usage-badge="cpu">여유</span>
+      </div>
+      <svg class="cockpit-gauge-svg" viewBox="0 0 180 148" role="img" aria-label="CPU 사용률">
+        <text class="gauge-scale-tick" x="34" y="139" text-anchor="middle">0</text>
+        <text class="gauge-scale-tick" x="90" y="11" text-anchor="middle">50</text>
+        <text class="gauge-scale-tick" x="146" y="139" text-anchor="middle">100</text>
+        <path class="gauge-track" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100"/>
+        <path class="gauge-arc is-teal" data-usage-arc="cpu" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100" stroke-dasharray="0 100"/>
+        <text class="gauge-center-val" x="90" y="79" text-anchor="middle" data-usage-total="cpu">N/A</text>
+        <text class="gauge-center-sub" x="90" y="96" text-anchor="middle">코어 비율</text>
+      </svg>
+      <div class="cockpit-dial-figures">
+        <strong data-total-detail="cpu">수집 대기</strong>
+        {% if current.users and current.users|map(attribute='cpu')|unique|list|length == 1 %}
+        <small>한도: {{ current.users[0].cpu or '제한 없음' }}{% if current.users[0].cpu %} 코어{% endif %}</small>
+        {% else %}
+        <small>한도: 계정별 한도 설정</small>
+        {% endif %}
+      </div>
+      <div class="cockpit-card-foot">
+        <svg class="meter-svg" viewBox="0 0 100 9" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="meter-svg-bg" x="0" y="0" width="100" height="9" rx="4.5"/>
+          <rect class="meter-svg-fill-teal" data-usage-bar-rect="cpu" x="0" y="0" width="0" height="9" rx="4.5"/>
+        </svg>
+        <div class="cockpit-card-link-row">
+          <span data-usage-time>수집 대기</span>
+          <a href="/labs/{{lab.id}}/limits">한도 조절 ›</a>
+        </div>
+      </div>
+    </article>
+
+    <!-- 3. Memory (RAM) Dial -->
+    <article class="cockpit-card">
+      <div class="cockpit-card-head">
+        <h2>시스템 메모리</h2>
+        <span class="sig-badge sig-safe" data-usage-badge="memory">여유</span>
+      </div>
+      <svg class="cockpit-gauge-svg" viewBox="0 0 180 148" role="img" aria-label="시스템 메모리 사용률">
+        <text class="gauge-scale-tick" x="34" y="139" text-anchor="middle">0</text>
+        <text class="gauge-scale-tick" x="90" y="11" text-anchor="middle">50</text>
+        <text class="gauge-scale-tick" x="146" y="139" text-anchor="middle">100</text>
+        <path class="gauge-track" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100"/>
+        <path class="gauge-arc is-sky" data-usage-arc="memory" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100" stroke-dasharray="0 100"/>
+        <text class="gauge-center-val" x="90" y="79" text-anchor="middle" data-usage-total="memory">N/A</text>
+        <text class="gauge-center-sub" x="90" y="96" text-anchor="middle">RAM</text>
+      </svg>
+      <div class="cockpit-dial-figures">
+        <strong data-total-detail="memory">수집 대기</strong>
+        {% if current.users and current.users|map(attribute='ram')|unique|list|length == 1 %}
+        <small>한도: {{ current.users[0].ram or '제한 없음' }}{% if current.users[0].ram %} GiB{% endif %}</small>
+        {% else %}
+        <small>한도: 계정별 한도 설정</small>
+        {% endif %}
+      </div>
+      <div class="cockpit-card-foot">
+        <svg class="meter-svg" viewBox="0 0 100 9" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="meter-svg-bg" x="0" y="0" width="100" height="9" rx="4.5"/>
+          <rect class="meter-svg-fill-sky" data-usage-bar-rect="memory" x="0" y="0" width="0" height="9" rx="4.5"/>
+        </svg>
+        <div class="cockpit-card-link-row">
+          <span>서버 여유 {{"%.0f"|format(free_ram_gib)}} GiB</span>
+          <a href="/labs/{{lab.id}}/limits">한도 조절 ›</a>
+        </div>
+      </div>
+    </article>
+
+    <!-- 4. Lab Disk Dial -->
+    <article class="cockpit-card">
+      <div class="cockpit-card-head">
+        <h2>연구실 디스크</h2>
+        <span class="sig-badge {{ 'sig-crit' if lab_disk_pct >= 85 else 'sig-warn' if lab_disk_pct >= 65 else 'sig-info' if lab_disk_pct >= 25 else 'sig-safe' }}">{{ '혼잡' if lab_disk_pct >= 85 else '주의' if lab_disk_pct >= 65 else '활발' if lab_disk_pct >= 25 else '여유' }}</span>
+      </div>
+      {% set disk_vis = 2.2 if lab_disk_pct > 0 and lab_disk_pct < 2.2 else lab_disk_pct %}
+      <svg class="cockpit-gauge-svg" viewBox="0 0 180 148" role="img" aria-label="연구실 디스크 사용률">
+        <text class="gauge-scale-tick" x="34" y="139" text-anchor="middle">0</text>
+        <text class="gauge-scale-tick" x="90" y="11" text-anchor="middle">50</text>
+        <text class="gauge-scale-tick" x="146" y="139" text-anchor="middle">100</text>
+        <path class="gauge-track" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100"/>
+        {% if disk_vis > 0 %}
+        <path class="gauge-arc {{ 'is-crit' if lab_disk_pct >= 85 else 'is-amber' if lab_disk_pct >= 65 else 'is-sky' if lab_disk_pct >= 25 else 'is-teal' }}" d="M 44.7 125.3 A 64 64 0 1 1 135.3 125.3" pathLength="100" stroke-dasharray="{{"%.1f"|format(disk_vis)}} 100"/>
+        {% endif %}
+        <text class="gauge-center-val" x="90" y="79" text-anchor="middle">{{"%.1f"|format(lab_disk_pct)}}%</text>
+        <text class="gauge-center-sub" x="90" y="96" text-anchor="middle">디스크</text>
+      </svg>
+      <div class="cockpit-dial-figures">
+        <strong>{{lab.used_gb}} / {{lab.storage_gb}} GB</strong>
+        <small>남은 공간 {{"%.1f"|format(lab_disk_free)}} GB</small>
+      </div>
+      <div class="cockpit-card-foot">
+        <svg class="meter-svg" viewBox="0 0 100 9" preserveAspectRatio="none" aria-hidden="true">
+          <rect class="meter-svg-bg" x="0" y="0" width="100" height="9" rx="4.5"/>
+          <rect class="{{ 'meter-svg-fill-crit' if lab_disk_pct >= 85 else 'meter-svg-fill-amber' if lab_disk_pct >= 65 else 'meter-svg-fill-teal' }}" x="0" y="0" width="{{"%.1f"|format([100, [0, lab_disk_pct]|max]|min)}}" height="9" rx="4.5"/>
+        </svg>
+        <div class="cockpit-card-link-row">
+          <a href="/labs/{{lab.id}}/storage">용량 관리 ›</a>
+          <a href="/labs/{{lab.id}}/files">저장공간 분석 ›</a>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- Row 2: Lower Deck (Left: Account IDs & Quick SSH / Right: Visual Lab Isolation Topology) -->
+  <section class="cockpit-deck-2col">
+    <div class="cockpit-card">
+      <div class="cockpit-card-head">
+        <div>
+          <h2>구성원 실시간 상태 · 빠른 접속</h2>
+          <small class="muted">{{ '공용 컨테이너 · 동일한 SSH 포트' if current.account_layout == 'shared' else '계정별 컨테이너 · 개별 SSH 포트' }}</small>
+        </div>
+        <a class="button secondary btn-sm" href="/labs/{{lab.id}}/accounts">전체 관리 ›</a>
+      </div>
+
+      <div class="cockpit-member-list" data-access-host="{{access_host}}">
+        {% for u in lab.users %}
+        <div class="cockpit-member-row" data-usage-user="{{u.name}}">
+          <div class="cockpit-member-ident">
+            <span class="cockpit-member-avatar" aria-hidden="true">{{u.name[:2]|upper}}</span>
+            <div>
+              <div class="cockpit-badge-row">
+                <span class="cockpit-dot" aria-hidden="true"></span>
+                <strong class="cockpit-member-id">{{u.name}}</strong>
+                <span class="person-state {{'online' if u.status=='running' else ''}}" data-usage-state>{{'실행 중' if u.status=='running' else '중지'}}</span>
+              </div>
+              <span class="cockpit-member-path">/home/{{u.name}}</span>
+            </div>
+          </div>
+          <div class="cockpit-member-right">
+            {% if current.account_layout != 'shared' %}
+            <span class="cockpit-member-usage">CPU <strong data-usage-value="cpu">—</strong> · RAM <strong data-usage-value="memory">—</strong></span>
+            {% endif %}
+            <span class="person-port-chip"><span>포트</span> <strong>{{u.port}}</strong></span>
+            <button type="button" class="btn-chip" data-copy-ssh data-user="{{u.name}}" data-port="{{u.port}}">SSH 복사</button>
+            <a class="btn-chip teal" href="/labs/{{lab.id}}/accounts#account-{{u.name}}">상세 ›</a>
+          </div>
+        </div>
+        {% else %}
+        <p class="muted">등록된 계정이 없습니다.</p>
+        {% endfor %}
+      </div>
     </div>
-    {% if current.home_only %}
-    <div class="iso-row">
-      <div><strong>개인 홈</strong> <code class="iso-code">/home/&lt;ID&gt;</code><span>일반 계정은 본인 홈 폴더만 접근</span></div>
-      <span class="iso-pill">개인 격리</span>
+
+    <div class="cockpit-card">
+      <div class="cockpit-card-head">
+        <div>
+          <h2>접근 및 저장 격리 구조</h2>
+          <small class="muted">연구실 디스크 · <code class="iso-code">/home/&lt;ID&gt;</code></small>
+        </div>
+      </div>
+
+      <div class="cockpit-flow-stack">
+        <div class="cockpit-flow-step">
+          <div class="cockpit-flow-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="2"/><circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/><path d="M8 6V4m4 2V4m4 2V4"/></svg>
+          </div>
+          <div class="cockpit-flow-body">
+            <div class="cockpit-flow-title">
+              <strong>전용 배정 GPU</strong>
+              <span class="iso-pill">GPU {{lab_idxs|join(', ')}}</span>
+            </div>
+            <p>할당된 GPU만 컨테이너에 연결</p>
+          </div>
+        </div>
+
+        <div class="cockpit-flow-arrow" aria-hidden="true">
+          <svg width="16" height="14" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 2v12m-4-4 4 4 4-4"/></svg>
+        </div>
+
+        <div class="cockpit-flow-step">
+          <div class="cockpit-flow-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7L12 2.5Z"/><path d="M3.5 7 12 11.5 20.5 7"/><path d="M12 11.5v10"/></svg>
+          </div>
+          <div class="cockpit-flow-body">
+            <div class="cockpit-flow-title">
+              <strong>연구실 컨테이너</strong>
+              <span class="iso-pill">{{ '공용 컨테이너 1개' if current.account_layout=='shared' else '개인별 컨테이너' }}</span>
+            </div>
+            <p>선택한 공식 개발환경과 패키지가 격리 실행됩니다.</p>
+          </div>
+        </div>
+
+        <div class="cockpit-flow-arrow" aria-hidden="true">
+          <svg width="16" height="14" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 2v12m-4-4 4 4 4-4"/></svg>
+        </div>
+
+        <div class="cockpit-flow-step is-home">
+          <div class="cockpit-flow-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+          </div>
+          <div class="cockpit-flow-body">
+            <div class="cockpit-flow-title">
+              <strong>개인 홈</strong> <code class="iso-code">/home/&lt;ID&gt;</code>
+              <span class="iso-pill">개인 격리</span>
+            </div>
+            <p>전체 계정이 하나의 저장공간을 함께 사용</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="cockpit-card-foot">
+        <div class="cockpit-card-link-row">
+          <span>서버 저장 경로</span>
+          <code class="host-storage-path">{{lab.storage_path}}</code>
+        </div>
+        <details>
+          <summary>지표 집계 기준 안내</summary>
+          <p class="muted">{{ '공용 컨테이너 전체 사용량입니다. 개인별 점유율로 표시하지 않습니다.' if current.account_layout == 'shared' else '사용자별 수치는 해당 계정 컨테이너 기준입니다. 메모리는 Docker 통계 기준이며 파일 캐시 일부는 제외됩니다.' }}</p>
+        </details>
+      </div>
     </div>
-    <div class="iso-row is-shared">
-      <div><strong>연구실 저장공간</strong><span>전체 계정이 하나의 저장공간을 함께 사용</span></div>
-      <span class="iso-pill">단일 저장공간</span>
-    </div>
-    {% else %}
-    <div class="iso-row">
-      <div><strong>개인 폴더</strong> <code class="iso-code">/home/&lt;ID&gt;</code><span>본인 계정 컨테이너만 접근</span></div>
-      <span class="iso-pill">개인 격리</span>
-    </div>
-    <div class="iso-row is-shared">
-      <div><strong>공동 폴더</strong> <code class="iso-code">/shared</code><span>같은 연구실 구성원 공동 사용</span></div>
-      <span class="iso-pill">연구실 공유</span>
-    </div>
-    {% endif %}
-  </div>
-</section>
+  </section>
+</div>
 
 <details class="card card-pad">
   <summary>연구실 정보</summary>
@@ -187,7 +432,7 @@
 
 {% elif section in ['resources','limits','gpu','storage'] %}
 {% if section=='resources' %}
-<div class="settings-list">{% for k,label in [('limits','CPU·메모리 할당'),('gpu','GPU'),('storage','연구실 저장공간' if current.home_only else '공유 저장공간')] %}<a class="settings-item" href="/labs/{{lab.id}}/{{k}}"><div><strong>{{label}}</strong></div><span>›</span></a>{% endfor %}</div>
+<div class="settings-list">{% for k,label in [('limits','CPU·메모리 할당'),('gpu','GPU'),('storage','연구실 디스크')] %}<a class="settings-item" href="/labs/{{lab.id}}/{{k}}"><div><strong>{{label}}</strong></div><span>›</span></a>{% endfor %}</div>
 <section class="card card-pad"><h2>현재 계정별 한도</h2><div class="scroll"><table><thead><tr><th>계정</th><th>CPU</th><th>메모리</th></tr></thead><tbody>{% for u in current.users|unique(attribute="container") %}<tr><td>{{u.name}}</td><td>{{u.cpu or '제한 없음'}} {{'코어' if u.cpu else ''}}</td><td>{{u.ram or '제한 없음'}} {{'GiB' if u.ram else ''}}</td></tr>{% endfor %}</tbody></table></div></section>
 {% endif %}
 
@@ -232,7 +477,7 @@
     <input type="hidden" name="action" value="gpu_reconfigure">
     <input type="hidden" name="lab" value="{{lab.id}}">
     <input type="hidden" name="expected_fingerprint" value="{{current.fingerprint}}">
-    <div class="gpu-picker">{% for g in data.gpus %}<label class="gpu-choice"><input type="checkbox" name="gpu_selection" value="{{g.index}}" {% if g.index in (lab.gpu_indices or [lab.gpu]) %}checked{% endif %}><strong>GPU {{g.index}}</strong><small>{{g.name}}</small><small>{{g.util}}% · {{g.used}} / {{g.total}} MiB</small>{% for owner in data.labs if g.index in (owner.gpu_indices or [owner.gpu]) %}<small>{{owner.title}}</small>{% endfor %}</label>{% endfor %}</div>
+    <div class="gpu-picker">{% for g in data.gpus %}<label class="gpu-choice"><input type="checkbox" name="gpu_selection" value="{{g.index}}" {% if g.index in lab_idxs %}checked{% endif %}><strong>GPU {{g.index}}</strong><small>{{g.name}}</small><small>{{g.util}}% · {{g.used}} / {{g.total}} MiB</small>{% for owner in data.labs if g.index in (owner.gpu_indices or [owner.gpu]) %}<small>{{owner.title}}</small>{% else %}<small>미배정</small>{% endfor %}</label>{% endfor %}</div>
     <label class="check-label"><input type="checkbox" name="ack_downtime" value="yes" required> 실행 작업 중단 확인</label>
     <label class="check-label"><input type="checkbox" name="ack_recreate" value="yes" required> 연구실 환경 재생성 확인</label>
     <label class="check-label"><input type="checkbox" name="ack_shared" value="yes"> 사용 중인 GPU의 공유 배정 확인</label>
@@ -245,16 +490,16 @@
 
 {% if section=='storage' %}
 <section class="card card-pad">
-  <h2>{{ '연구실 저장공간' if current.home_only else '공유 저장공간' }}</h2>
+  <h2>연구실 디스크</h2>
   <dl class="storage-location"><dt>서버 저장 경로</dt><dd><code>{{lab.storage_path}}</code></dd>{% if lab.storage_file %}<dt>저장 파일</dt><dd><code>{{lab.storage_file}}</code></dd>{% endif %}</dl>
-  <p>기존 저장 경로는 실행 환경 보호를 위해 조회만 제공합니다.</p>
+  <p>기존 저장 경로는 실행 환경 보호를 위해 조회만 제공합니다. 서버 여유 공간: <strong>{{ hs.free_gb if hs else '—' }} GB</strong></p>
   <p>{{lab.used_gb}} / {{lab.storage_gb}} GB</p>
   <form method="post" action="/action" data-lab-title="{{lab.title}}" data-current="{{lab.allocated_gb}} GB" data-impact="재시작 없음" data-review="저장공간을 확장합니다. 기존 파일과 실행 환경은 유지됩니다.">
     <input type="hidden" name="csrf" value="{{session.csrf}}">
     <input type="hidden" name="action" value="grow">
     <input type="hidden" name="lab" value="{{lab.id}}">
     <label for="storage-value">확대 후 용량 (GB)</label>
-    <div class="range-pair"><input type="range" min="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" max="{{storage_limit}}" value="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" data-pair="storage-value" aria-label="공유 저장공간"><input type="number" id="storage-value" name="size_gb" min="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" max="{{storage_limit}}" value="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" required></div>
+    <div class="range-pair"><input type="range" min="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" max="{{storage_limit}}" value="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" data-pair="storage-value" aria-label="연구실 디스크"><input type="number" id="storage-value" name="size_gb" min="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" max="{{storage_limit}}" value="{{(lab.allocated_gb or lab.storage_gb)|int+1}}" required></div>
     <label>연구실 ID 확인</label><input name="confirm" required placeholder="{{lab.id}}">
     <button {% if not lab.writable or lab.imported or (lab.allocated_gb or lab.storage_gb)>=storage_limit %}disabled{% endif %}>저장공간 확장</button>
   </form>
@@ -286,10 +531,52 @@
 <section class="card card-pad"><h2>개발환경 변경 기록</h2><div id="backup-jobs" data-lab="{{lab.id}}">{% for j in catalog.jobs if j.lab==lab.id and j.kind=='environment' %}<p>{{j.time}} · {{j.message}}</p>{% else %}<p>작업 없음</p>{% endfor %}</div></section>
 
 {% elif section=='backups' %}
-<section class="card card-pad"><h2>연구실 파일 백업</h2><p>컨테이너 파일시스템과 영구 저장공간을 함께 저장합니다. 재시작·일시정지는 수행하지 않습니다.</p><p>실행 중 변경되는 파일의 동일 시점 일관성은 보장되지 않습니다. 학습 결과 저장이 완료된 시점에 실행하세요.</p><form method="post" action="/hot-action"><input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="backup"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="user" value="{{lab.users[0].name}}"><label class="check-label"><input type="checkbox" name="consistency" value="live" required> 무중단 파일 백업의 일관성 범위를 확인했습니다.</label><label>연구실 ID 확인</label><input name="confirm" placeholder="{{lab.id}}" required><button {% if not lab.writable %}disabled{% endif %}>백업 시작</button></form></section>
+<div class="backup-split-grid">
+  <section class="card card-pad">
+    <h2>출력 계정</h2>
+    <p>선택한 계정만 문서에 포함됩니다. 실제 계정은 변경되지 않습니다.</p>
+    <form method="post" action="/manual/pdf" id="manual-form">
+      <input type="hidden" name="account_selection" value="explicit">
+      <input type="hidden" name="csrf" value="{{session.csrf}}">
+      <input type="hidden" name="lab" value="{{lab.id}}">
+      <div class="pdf-account-chips">
+        {% for u in lab.users %}
+        <label class="pdf-account-chip"><input type="checkbox" name="selected_account" value="{{u.name}}" {% if u.name in selected_accounts %}checked{% endif %}><span>{{u.name}}</span></label>
+        {% endfor %}
+      </div>
+      <label for="lab-doc-lang">문서 언어</label>
+      <select id="lab-doc-lang" name="document_language">
+        <option value="ko" {% if current_language=='ko' %}selected{% endif %}>한국어</option>
+        <option value="en" {% if current_language=='en' %}selected{% endif %}>English</option>
+      </select>
+      <label for="lab-doc-note">추가 안내 (선택)</label>
+      <textarea id="lab-doc-note" name="note" rows="2" maxlength="600"></textarea>
+      <div class="pdf-actions-row">
+        <button type="submit" class="secondary" formaction="/manual">선택 미리보기</button>
+        <button type="submit">PDF 다운로드</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card card-pad">
+    <h2>연구실 파일 백업</h2>
+    <p>컨테이너 파일시스템과 영구 저장공간을 함께 저장합니다. 재시작·일시정지는 수행하지 않습니다.</p>
+    <p class="muted">실행 중 변경되는 파일의 동일 시점 일관성은 보장되지 않습니다. 학습 결과 저장이 완료된 시점에 실행하세요.</p>
+    <form method="post" action="/hot-action">
+      <input type="hidden" name="csrf" value="{{session.csrf}}">
+      <input type="hidden" name="action" value="backup">
+      <input type="hidden" name="lab" value="{{lab.id}}">
+      <input type="hidden" name="user" value="{{lab.users[0].name if lab.users else ''}}">
+      <label class="check-label"><input type="checkbox" name="consistency" value="live" required> 무중단 파일 백업의 일관성 범위를 확인했습니다.</label>
+      <label>연구실 ID 확인</label><input name="confirm" placeholder="{{lab.id}}" required>
+      <button {% if not lab.writable %}disabled{% endif %}>백업 시작</button>
+    </form>
+  </section>
+</div>
 <section class="card card-pad"><h2>백업 진행 상태</h2><div id="backup-jobs" data-lab="{{lab.id}}">{% for j in catalog.jobs if j.lab==lab.id %}<p>{{j.time}} · {{j.state}} · {{j.message}}</p>{% else %}<p>백업 기록이 없습니다.</p>{% endfor %}</div></section>
 {% endif %}
 <script src="/static/lab-configuration.js" defer></script>
 <script src="/static/user-limits.js" defer></script>
 <script src="/static/lab-usage.js" defer></script>
+<script src="/static/accounts.js" defer></script>
 {% endblock %}

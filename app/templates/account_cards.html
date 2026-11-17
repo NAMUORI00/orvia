@@ -15,15 +15,14 @@
 {% set role=('권한 설정 확인 필요' if runtime.permissions.status!='configured' else '컨테이너 관리자' if runtime.permissions.container_sudo else '표준 사용자') if runtime else 'N/A' %}
 <details class="person-card" id="account-{{u.name}}" data-account-card data-search="{{u.name}} {{u.profile.display_name or ''}} {{u.profile.student_id or ''}} {{u.port}}">
   <summary class="person-summary">
-    <span class="person-avatar" aria-hidden="true">{{(u.profile.display_name or u.name)[:2]|upper}}</span>
+    <span class="person-avatar" aria-hidden="true">{{u.name[:2]|upper}}</span>
     <span class="person-title">
-      <strong>{{u.profile.display_name or u.name}}</strong>
-      <span>@{{u.name}}</span>
+      <strong>{{u.name}}</strong>
       <span class="person-role">{{role}}</span>
     </span>
     <span class="person-meta-right">
       <span class="person-port-chip"><span>포트</span> <strong>{{u.port}}</strong></span>
-      <button type="button" class="btn-chip" data-copy-ssh data-user="{{u.name}}" data-port="{{u.port}}">명령어</button>
+      <button type="button" class="btn-chip" data-copy-ssh data-user="{{u.name}}" data-port="{{u.port}}">SSH 복사</button>
       <span class="person-state {{'online' if u.status=='running' else ''}}"><i></i>{{'실행 중' if u.status=='running' else '중지'}}</span>
       <svg class="person-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg>
     </span>
@@ -34,8 +33,9 @@
       <button type="button" class="btn-sm" data-copy-guide data-lab="{{lab.title}}" data-user="{{u.name}}" data-display="{{u.profile.display_name or u.name}}" data-port="{{u.port}}">접속 안내 복사</button>
     </div>
     <dl class="person-facts">
+      <div><dt>사용자명</dt><dd>{{u.profile.display_name or 'N/A'}}</dd></div>
       <div><dt>학번</dt><dd>{{u.profile.student_id or 'N/A'}}</dd></div>
-      <div><dt>SSH 포트</dt><dd>{{u.port}}</dd></div>{% if current.home_only %}<div><dt>개인 홈</dt><dd>/home/{{u.name}}</dd></div>{% endif %}
+      <div><dt>SSH 포트</dt><dd>{{u.port}}</dd></div>{% if current.home_only or current.account_layout == 'shared' %}<div><dt>개인 홈</dt><dd>/home/{{u.name}}</dd></div>{% endif %}
       <div><dt>이메일</dt><dd>{{u.profile.email or 'N/A'}}</dd></div>
       <div><dt>추가일자</dt><dd>{{u.profile.joined_on or 'N/A'}}</dd></div>
       <div><dt>이용 종료일</dt><dd>{{u.profile.expires_on or 'N/A'}}</dd></div>
@@ -72,4 +72,3 @@
 {% endfor %}
 </section>
 <p data-account-empty hidden>검색 결과 없음</p>
-<script src="/static/accounts.js" defer></script>

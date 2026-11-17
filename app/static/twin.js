@@ -352,7 +352,7 @@
         Math.max(0, Math.round((Number(lab.used_gb || 0) / Math.max(1, Number(lab.storage_gb || 1))) * 100)),
       );
       const sMeta = el("div", null, "lab-storage-meta");
-      sMeta.append(el("span", "공유 저장공간"), rawEl("span", pct + "%"));
+      sMeta.append(el("span", "연구실 디스크"), rawEl("span", pct + "%"));
       const barSvg = svgNode("svg", {
         viewBox: "0 0 100 6",
         preserveAspectRatio: "none",
@@ -696,7 +696,6 @@
       r.append(l, rawEl("span", t(pill), "iso-pill"));
       return r;
     };
-    const isHomeOnly = Boolean(lab.home_only || cat?.home_only);
     stack.append(
       mkIso(
         "배정 GPU 공동 사용",
@@ -705,15 +704,8 @@
         idxs.length ? "GPU " + idxs.join(", ") : t("미배정"),
         false,
       ),
-      ...(isHomeOnly
-        ? [
-            mkIso("개인 홈", "/home/<ID>", "일반 계정은 본인 홈 폴더만 접근", "개인 격리", false),
-            mkIso("연구실 저장공간", "", "전체 계정이 하나의 저장공간을 함께 사용", "단일 저장공간", true),
-          ]
-        : [
-            mkIso("개인 폴더", "/home/<ID>", "본인 계정 컨테이너만 접근", "개인 격리", false),
-            mkIso("공동 폴더", "/shared", "같은 연구실 구성원 공동 사용", "연구실 공유", true),
-          ]),
+      mkIso("개인 홈", "/home/<ID>", "일반 계정은 본인 홈 폴더만 접근", "개인 격리", false),
+      mkIso("연구실 저장공간", "", "전체 계정이 하나의 저장공간을 함께 사용", "단일 저장공간", true),
     );
     isoCard.append(stack);
     body.append(isoCard);
@@ -750,7 +742,7 @@
       ),
       mkKv("CPU · 메모리 한도", quotaLabel),
       mkKv(
-        isHomeOnly ? "연구실 저장공간" : "공유 저장공간",
+        "연구실 디스크",
         capUsage(lab.used_gb) + " / " + capGb(lab.storage_gb),
       ),
     );
@@ -910,7 +902,7 @@
         null,
         "presence " + (u.status === "running" ? "online" : "offline"),
       );
-      nameRow.append(dot, rawEl("strong", displayName), rawEl("span", "@" + u.name));
+      nameRow.append(dot, rawEl("strong", u.name));
       const portMeta = rawEl(
         "div",
         t("포트") + " " + (u.port || "—") + " · " + t(u.status === "running" ? "실행 중" : "중지"),
@@ -931,10 +923,9 @@
       guideBtn.type = "button";
       const guideText = [
         "[" + lab.title + "] " + t("GPU 서버 접속 안내"),
-        "- " + t("사용자") + ": " + displayName + " (@" + u.name + ")",
+        "- " + t("사용자") + ": " + u.name,
         "- " + t("접속 명령") + ": " + sshCmd,
         "- " + t("개인 폴더") + ": /home/" + u.name,
-        "- " + t("공동 폴더") + ": /shared",
       ].join("\n");
       guideBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -949,7 +940,9 @@
       const catUser = cat?.users?.find((cu) => cu.name === u.name);
       const facts = el("div", null, "panel-acc-facts");
       facts.append(
+        rawEl("span", t("사용자명") + ": " + (u.profile?.display_name || "N/A")),
         rawEl("span", t("학번") + ": " + (u.profile?.student_id || "N/A")),
+        rawEl("span", t("이메일") + ": " + (u.profile?.email || "N/A")),
         rawEl(
           "span",
           "CPU: " +
@@ -1070,10 +1063,10 @@
     gpuCard.append(gpuForm);
     body.append(gpuCard);
 
-    // 2. Shared Storage Expansion Card
+    // 2. Lab Disk Expansion Card
     const stCard = el("div", null, "panel-section-card");
     const stHead = el("div", null, "panel-card-head");
-    stHead.append(el("strong", (lab.home_only || cat?.home_only) ? "연구실 저장공간" : "공유 저장공간"), makeSignalBadge(true, "무중단 · 즉시 적용"));
+    stHead.append(el("strong", "연구실 디스크"), makeSignalBadge(true, "무중단 · 즉시 적용"));
     stCard.append(stHead);
 
     const curGb = Math.round(Number(lab.allocated_gb || lab.storage_gb || 0));

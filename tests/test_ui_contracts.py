@@ -183,3 +183,73 @@ class TemplateAndAssetContractTests(unittest.TestCase):
         self.assertIn('placeholder="Search ID · name · port"', rendered)
         self.assertIn("Screen guide", rendered)
         self.assertEqual(rendered.count("/>"), 3)
+
+    def test_js_and_templates_have_no_legacy_glyphs_or_shared_folder_ui(self):
+        banned_glyphs = re.compile(r"[◫◉▤▧▦▥▣♙▰◷]")
+        for path in sorted((ROOT / "app/static").glob("*.js")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(js=path.name):
+                self.assertIsNone(
+                    banned_glyphs.search(text),
+                    f"Legacy Unicode glyph in {path.name}",
+                )
+                self.assertNotIn("/shared", text, f"Deprecated /shared mention in {path.name}")
+        for path in sorted((ROOT / "app/templates").glob("*.html")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(template=path.name):
+                self.assertNotIn("/shared", text, f"Deprecated /shared mention in {path.name}")
+
+    def test_account_cards_summary_shows_account_id_only_and_body_has_details(self):
+        text = (ROOT / "app/templates/account_cards.html").read_text(encoding="utf-8")
+        summary_match = re.search(
+            r'<summary class="person-summary">.*?</summary>', text, re.S
+        )
+        body_match = re.search(
+            r'<div class="person-body">.*?</details>', text, re.S
+        )
+        self.assertIsNotNone(summary_match)
+        self.assertIsNotNone(body_match)
+        summary = summary_match.group(0)
+        body = body_match.group(0)
+        self.assertIn("{{u.name}}", summary)
+        self.assertNotIn("display_name", summary)
+        self.assertNotIn("student_id", summary)
+        self.assertIn("display_name", body)
+        self.assertIn("student_id", body)
+
+    def test_broker_host_storage_info_reports_headroom(self):
+        import os
+        import broker
+
+        st = os.statvfs_result((4096, 4096, 7000000000, 5000000000, 5000000000, 0, 0, 0, 0, 255))
+        with patch.object(broker.os, "statvfs", return_value=st):
+            info = broker._host_storage_info(
+                {"provision_root": "/raid/labharbor", "labs": {}},
+                [{"allocated_gb": 5000.0, "used_gb": 1840.5}],
+            )
+        self.assertGreater(info["total_gb"], 20000)
+        self.assertGreater(info["free_gb"], 15000)
+        self.assertEqual(info["allocated_gb"], 5000.0)
+        self.assertEqual(info["used_gb"], 1840.5)
+
+    def test_localized_html_translates_cockpit_v4_terms(self):
+        sample = (
+            '<section aria-label="서버 가용 자원 여유">'
+            "<span>서버 여유 GPU</span>"
+            "<span>연구실 디스크</span>"
+            "<span>계기판 개요</span>"
+            "<span>미배정 여유</span>"
+            "</section>"
+        )
+        parser = LocalizedHTML("en")
+        parser.feed(sample)
+        rendered = "".join(parser.parts)
+        for expected in (
+            "Server available capacity",
+            "Host free GPU",
+            "Lab disk",
+            "Cockpit overview",
+            "Unassigned free",
+        ):
+            self.assertIn(expected, rendered)
+        self.assertFalse(any("\uac00" <= c <= "\ud7a3" for c in rendered))

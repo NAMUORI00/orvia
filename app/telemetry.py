@@ -369,7 +369,47 @@ def read(hours=2, start=None, end=None):
     with database() as c:
         result = history_store.query(c, since, until, network_summary)
     result["historical"] = historical
+    result["host_summary"] = _host_summary()
     return result
+
+
+def _host_summary():
+    """Return non-sensitive host storage pool headroom and GPU ownership map."""
+    try:
+        c = hotops.cfg()
+    except (OSError, ValueError):
+        return {}
+    gpu_owners = {}
+    gpu_lab_ids = {}
+    candidates = []
+    if c.get("provision_root"):
+        candidates.append(pathlib.Path(c["provision_root"]))
+    for lab_id, s in (c.get("labs") or {}).items():
+        for idx in s.get("indices", [s.get("index")]):
+            if idx is not None:
+                gpu_owners[str(idx)] = s.get("title", lab_id)
+                gpu_lab_ids[str(idx)] = lab_id
+        if s.get("disk"):
+            candidates.append(pathlib.Path(s["disk"]).parent)
+        elif s.get("storage"):
+            candidates.append(pathlib.Path(s["storage"]).parent)
+    pool_path, total_bytes, free_bytes = None, None, None
+    for candidate in candidates + [pathlib.Path("/")]:
+        try:
+            st = os.statvfs(str(candidate))
+            pool_path = str(candidate)
+            total_bytes = st.f_blocks * st.f_frsize
+            free_bytes = st.f_bavail * st.f_frsize
+            break
+        except OSError:
+            continue
+    return dict(
+        pool_path=pool_path,
+        pool_total_bytes=total_bytes,
+        pool_free_bytes=free_bytes,
+        gpu_owners=gpu_owners,
+        gpu_lab_ids=gpu_lab_ids,
+    )
 
 
 def retention(values=None):

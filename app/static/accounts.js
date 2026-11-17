@@ -40,10 +40,9 @@
       const cmd = "ssh -p " + btn.dataset.port + " " + btn.dataset.user + "@" + hostAddr;
       const guide = [
         "[" + btn.dataset.lab + "] " + t("GPU 서버 접속 안내"),
-        "- " + t("사용자") + ": " + btn.dataset.display + " (@" + btn.dataset.user + ")",
+        "- " + t("사용자") + ": " + btn.dataset.user,
         "- " + t("접속 명령") + ": " + cmd,
         "- " + t("개인 폴더") + ": /home/" + btn.dataset.user,
-        "- " + t("공동 폴더") + ": /shared",
       ].join("\n");
       window.orviaCopy?.(guide, "접속 안내 문구를 복사했습니다.");
     });

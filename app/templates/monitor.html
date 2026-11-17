@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-head monitor-head">
   <div>
-    <p class="eyebrow">ORVIA</p>
+    <p class="eyebrow">ORVIA TELEMETRY CLUSTER</p>
     <h1>운영 현황</h1>
   </div>
   <div class="monitor-tools">
@@ -27,42 +27,56 @@
 </form>
 <p id="history-summary" class="muted"></p>
 <div class="monitor-meta">
-  <span id="monitor-time">수집 대기</span
-  ><span>그래프에 마우스를 올리거나 터치하면 수치를 확인할 수 있습니다.</span>
+  <span id="monitor-time">수집 대기</span>
+  <div class="monitor-actions">
+    <button id="monitor-hardware-open" class="secondary btn-sm" type="button">하드웨어</button>
+    <button id="monitor-events-open" class="secondary btn-sm" type="button">변경 기록</button>
+    <button id="monitor-info-open" class="secondary btn-sm" type="button">집계 기준</button>
+    <button id="retention-open" type="button" class="secondary btn-sm">기록 보관</button>
+  </div>
 </div>
+
+<!-- Server Allocatable Headroom Strip -->
+<section id="monitor-headroom" class="host-headroom-strip" aria-label="서버 가용 자원 여유"></section>
+
+<!-- 4 Master Server Dials + Sparklines -->
 <h2>전체 서버</h2>
-<div id="monitor-overview" class="overview-metrics"></div>
+<div id="monitor-overview" class="cockpit-dial-grid"></div>
+
+<!-- Live 8-GPU Hardware & Thermal Strip -->
+<section id="monitor-gpu-section" class="card card-pad lab-resource-section">
+  <div class="usage-heading">
+    <h2>GPU 물리 슬롯 · 미배정 여유 현황</h2>
+    <span class="muted">슬롯 선택 시 해당 연구실 상세 확인</span>
+  </div>
+  <div id="monitor-gpu-rack" class="gpu-rack-grid"></div>
+</section>
+
+<!-- Per-Lab 4-Resource Instrument Clusters -->
 <section class="card card-pad lab-resource-section">
   <div class="usage-heading">
-    <h2>연구실별 자원</h2>
+    <h2>연구실별 4대 자원 계기판</h2>
     <span class="muted">연구실 선택 · 사용자별 사용량</span>
   </div>
-  <div id="monitor-labs" class="lab-resource-grid"></div>
+  <div id="monitor-labs" class="monitor-lab-grid"></div>
 </section>
+
+<!-- Selected Lab Inline Member Drilldown -->
 <section id="lab-users-panel" class="card card-pad" hidden>
   <div class="usage-heading">
     <h2 id="lab-users-title"></h2>
     <button id="lab-users-close" type="button" class="secondary">접기</button>
   </div>
   <p class="muted">
-    CPU·메모리는 계정 환경 기준이며 GPU·저장공간은 연구실 공동 자원입니다.
+    CPU·메모리는 계정 환경 기준이며 GPU·연구실 디스크는 연구실 단위 공동 자원입니다.
   </p>
   <h3>사용자별 자원</h3>
-  <div id="monitor-users" class="account-map"></div>
+  <div id="monitor-users" class="monitor-user-grid"></div>
   <h3>네트워크 사용량</h3>
   <div class="network-legend"><span>● 수신</span><span>● 송신</span></div>
   <div id="network-ranking" class="network-ranking"></div>
 </section>
-<div class="monitor-actions">
-  <button id="monitor-hardware-open" class="secondary" type="button">
-    하드웨어</button
-  ><button id="monitor-events-open" class="secondary" type="button">
-    변경 기록</button
-  ><button id="monitor-info-open" class="secondary" type="button">
-    집계 기준
-  </button>
-  <button id="retention-open" type="button" class="secondary">기록 보관</button>
-</div>
+
 <dialog id="retention-dialog" class="insight-dialog">
   <form id="retention-form">
     <input type="hidden" name="csrf" value="{{session.csrf}}" />

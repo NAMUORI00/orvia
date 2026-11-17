@@ -29,7 +29,7 @@
 </section>
 <section class="card card-pad">
 <h2>출력 계정</h2><p>선택한 계정만 문서에 포함됩니다. 실제 계정은 변경되지 않습니다.</p>
-<div class="config-chips">{% for u in lab.users %}<label class="check-label"><input type="checkbox" name="selected_account" value="{{u.name}}" form="manual-form" {% if u.name in selected_accounts %}checked{% endif %}>{{u.name}}{% if u.profile.display_name %} · {{u.profile.display_name}}{% endif %}</label>{% endfor %}</div>
+<div class="config-chips">{% for u in lab.users %}<label class="check-label"><input type="checkbox" name="selected_account" value="{{u.name}}" form="manual-form" {% if u.name in selected_accounts %}checked{% endif %}><span>{{u.name}}</span></label>{% endfor %}</div>
 <button type="submit" form="manual-form" formaction="/manual">선택 미리보기</button>
 </section>
 <section class="card card-pad">

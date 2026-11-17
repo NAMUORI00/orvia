@@ -23,19 +23,49 @@
           }[m[2]]
       : null;
   }
+  function statusForPct(p) {
+    if (p == null) return { cls: "sig-idle", arc: "is-teal", label: "수집 대기" };
+    if (p >= 85) return { cls: "sig-crit", arc: "is-crit", label: "혼잡" };
+    if (p >= 65) return { cls: "sig-warn", arc: "is-amber", label: "주의" };
+    if (p >= 25) return { cls: "sig-info", arc: "is-sky", label: "활발" };
+    if (p >= 5) return { cls: "sig-safe", arc: "is-teal", label: "쾌적" };
+    return { cls: "sig-safe", arc: "is-teal", label: "여유" };
+  }
   function metric(node, key, value, total, detail) {
     const p = value != null && total > 0 ? (100 * value) / total : null;
-    node.querySelector(
-      "[data-usage-" + (node === root ? "total" : "value") + '="' + key + '"]',
-    ).textContent = p == null ? "N/A" : p.toFixed(2) + "%";
+    const isRoot = node === root;
+    const valEl = node.querySelector(
+      "[data-usage-" + (isRoot ? "total" : "value") + '="' + key + '"]',
+    );
+    if (valEl) {
+      valEl.textContent = p == null ? "N/A" : isRoot ? p.toFixed(1) + "%" : detail;
+    }
     const bar = node.querySelector('[data-usage-fill="' + key + '"]');
     if (bar) {
       bar.value = p == null ? 0 : Math.min(100, Math.max(0, p));
       bar.title = p == null ? "N/A" : p.toFixed(2) + "% · " + detail;
     }
+    const arc = node.querySelector('[data-usage-arc="' + key + '"]');
+    if (arc) {
+      const clamped = p == null ? 0 : Math.min(100, Math.max(0, p));
+      const vis = clamped === 0 ? 0 : Math.max(2.2, clamped);
+      arc.setAttribute("stroke-dasharray", vis.toFixed(1) + " 100");
+      const st = statusForPct(p);
+      arc.setAttribute("class", "gauge-arc " + (key === "memory" && clamped < 65 ? "is-sky" : st.arc));
+      const badge = node.querySelector('[data-usage-badge="' + key + '"]');
+      if (badge) {
+        badge.className = "sig-badge " + st.cls;
+        badge.textContent = t(st.label);
+      }
+    }
+    const rectBar = node.querySelector('[data-usage-bar-rect="' + key + '"]');
+    if (rectBar) {
+      const w = p == null ? 0 : Math.min(100, Math.max(0, p));
+      rectBar.setAttribute("width", w.toFixed(1));
+    }
     const extra = node.querySelector(
       "[" +
-        (node === root ? "data-total-detail" : "data-usage-detail") +
+        (isRoot ? "data-total-detail" : "data-usage-detail") +
         '="' +
         key +
         '"]',
@@ -45,11 +75,15 @@
   function render(data) {
     const stale = !data.ts || Date.now() / 1000 - data.ts > 180;
     root.classList.toggle("stale", stale);
-    root.querySelector("[data-usage-time]").textContent = data.ts
-      ? new Date(data.ts * 1000).toLocaleTimeString() +
-        " · " +
-        t(stale ? "수집 지연" : "최근 수집")
-      : t("수집 대기");
+    const timeEl = root.querySelector("[data-usage-time]");
+    if (timeEl) {
+      const loc = document.documentElement.lang === "en" ? "en-US" : "ko-KR";
+      timeEl.textContent = data.ts
+        ? new Date(data.ts * 1000).toLocaleTimeString(loc) +
+          " · " +
+          t(stale ? "수집 지연" : "최근 수집")
+        : t("수집 대기");
+    }
     let cpu = 0,
       memory = 0,
       known = true;
@@ -63,21 +97,25 @@
         cpu += c;
         memory += m;
       }
-      card.querySelector("[data-usage-state]").textContent = t(
-        stale
-          ? "수집 지연"
-          : !a
-            ? "수집 대기"
-            : a.running
-              ? "실행 중"
-              : "중지",
-      );
+      const stateEl = card.querySelector("[data-usage-state]");
+      if (stateEl) {
+        stateEl.textContent = t(
+          stale
+            ? "수집 지연"
+            : !a
+              ? "수집 대기"
+              : a.running
+                ? "실행 중"
+                : "중지",
+        );
+      }
+      const compact = !card.classList.contains("usage-user");
       metric(
         card,
         "cpu",
         c,
         data.cpu_count,
-        c == null ? "N/A" : c.toFixed(2) + " / " + data.cpu_count + " " + t("코어"),
+        c == null ? "N/A" : compact ? c.toFixed(2) + "c" : c.toFixed(2) + " / " + data.cpu_count + " " + t("코어"),
       );
       metric(
         card,
@@ -86,10 +124,9 @@
         data.memory_total,
         m == null
           ? "N/A"
-          : (m / 1024 ** 3).toFixed(2) +
-              " / " +
-              (data.memory_total / 1024 ** 3).toFixed(1) +
-              " GiB",
+          : compact
+            ? (m / 1024 ** 3).toFixed(1) + "G"
+            : (m / 1024 ** 3).toFixed(2) + " / " + (data.memory_total / 1024 ** 3).toFixed(1) + " GiB",
       );
     });
     if (data.shared) {
@@ -105,15 +142,24 @@
       "cpu",
       known ? cpu : null,
       data.cpu_count,
-      cpu.toFixed(2) + " " + t("코어"),
+      known && data.cpu_count
+        ? cpu.toFixed(2) + " / " + data.cpu_count + " " + t("코어")
+        : cpu.toFixed(2) + " " + t("코어"),
     );
     metric(
       root,
       "memory",
       known ? memory : null,
       data.memory_total,
-      (memory / 1024 ** 3).toFixed(2) + " GiB",
+      known && data.memory_total
+        ? (memory / 1024 ** 3).toFixed(2) + " / " + (data.memory_total / 1024 ** 3).toFixed(0) + " GiB"
+        : (memory / 1024 ** 3).toFixed(2) + " GiB",
     );
+    const hostFreeCpu = document.querySelector("[data-host-free-cpu]");
+    if (hostFreeCpu && known && data.cpu_count > 0) {
+      const rem = Math.max(0, data.cpu_count - cpu);
+      hostFreeCpu.textContent = "(" + t("여유") + " " + rem.toFixed(1) + "c)";
+    }
   }
   async function refresh() {
     clearTimeout(timer);
@@ -127,7 +173,8 @@
       render(await r.json());
     } catch (_) {
       render({ ts: null, accounts: [] });
-      root.querySelector("[data-usage-time]").textContent = t("수집 지연");
+      const timeEl = root.querySelector("[data-usage-time]");
+      if (timeEl) timeEl.textContent = t("수집 지연");
     } finally {
       loading = false;
       timer = setTimeout(refresh, 60000);

@@ -193,6 +193,7 @@ def snapshot():
         labs=labs,
         gpus=gpus,
         events=events,
+        host_storage=_host_storage_info(c, labs),
         load=os.getloadavg()[0],
         memory_used_gib=round((mem["MemTotal"] - mem["MemAvailable"]) / 1048576, 1),
         memory_total_gib=round(mem["MemTotal"] / 1048576),
@@ -213,6 +214,42 @@ def snapshot():
     )
     CACHE.update(time=time.monotonic(), data=data)
     return data
+
+
+def _host_storage_info(c, labs):
+    """Return host storage pool capacity and unallocated free headroom."""
+    allocated_gb = round(
+        sum((l.get("allocated_gb") or l.get("storage_gb") or 0) for l in labs), 1
+    )
+    used_gb = round(sum((l.get("used_gb") or 0) for l in labs), 1)
+    candidates = []
+    if c.get("provision_root"):
+        candidates.append(pathlib.Path(c["provision_root"]))
+    for s in (c.get("labs") or {}).values():
+        if s.get("disk"):
+            candidates.append(pathlib.Path(s["disk"]).parent)
+        elif s.get("storage"):
+            candidates.append(pathlib.Path(s["storage"]).parent)
+    candidates.append(pathlib.Path("/"))
+    for candidate in candidates:
+        try:
+            st = os.statvfs(str(candidate))
+            return dict(
+                path=str(candidate),
+                total_gb=round(st.f_blocks * st.f_frsize / 1e9, 1),
+                free_gb=round(st.f_bavail * st.f_frsize / 1e9, 1),
+                allocated_gb=allocated_gb,
+                used_gb=used_gb,
+            )
+        except OSError:
+            continue
+    return dict(
+        path="/",
+        total_gb=allocated_gb,
+        free_gb=0.0,
+        allocated_gb=allocated_gb,
+        used_gb=used_gb,
+    )
 
 
 GPU_PROBE = """import ctypes,json

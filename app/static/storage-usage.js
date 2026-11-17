@@ -206,7 +206,26 @@
       });
       b.className = "usage-path-row";
       const title = document.createElement("strong");
-      title.textContent = (a.directory ? "▰ " : "▤ ") + a.name;
+      title.className = "usage-path-title-wrap";
+      const entryIcon = V.svg("svg", {
+        viewBox: "0 0 20 20",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "1.75",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        class: "usage-path-icon",
+        "aria-hidden": "true",
+      });
+      if (a.directory) {
+        entryIcon.append(V.svg("path", { d: "M2.5 5.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2h6a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 16 16H4a1.5 1.5 0 0 1-1.5-1.5v-9Z" }));
+      } else {
+        entryIcon.append(
+          V.svg("path", { d: "M5.5 3h6l3 3v10a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" }),
+          V.svg("path", { d: "M11.5 3v3h3" }),
+        );
+      }
+      title.append(entryIcon, document.createTextNode(a.name));
       const bar = V.svg("svg", {
         viewBox: "0 0 500 12",
         preserveAspectRatio: "none",
