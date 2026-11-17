@@ -342,6 +342,7 @@ class Handler(socketserver.StreamRequestHandler):
                     CACHE.clear()
                 elif req.get("action") in {
                     "metadata",
+                    "container_rename",
                     "account_metadata",
                     "account_create",
                     "lab_separate",

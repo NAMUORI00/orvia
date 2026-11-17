@@ -408,6 +408,7 @@ def hot_action():
         "storage",
         "gpu_selection",
         "scope",
+        "container_name",
     ]
     req = {k: request.form.get(k) for k in fields}
     if req.get("action") == "gpu_reconfigure":
@@ -422,6 +423,7 @@ def hot_action():
 
         return redirect(return_path(next_url, request.host))
     target = {
+        "container_rename": "maintenance",
         "account_metadata": "accounts",
         "account_create": "accounts",
         "lab_separate": "maintenance",

@@ -1,3 +1,13 @@
+<section class="card card-pad"><h2>컨테이너 이름</h2>
+<p>관리 이름과 자동복구 연결을 함께 변경합니다. 계정·접속 포트·자료·실행 작업은 유지됩니다.</p>
+{% for u in current.users|unique(attribute='container') %}
+<form method="post" action="/hot-action" data-lab-title="{{lab.title}}" data-impact="무중단 이름 변경" data-review="컨테이너 이름과 관리 연결만 변경합니다. 호스트네임과 저장 경로는 변경하지 않습니다.">
+<input type="hidden" name="csrf" value="{{session.csrf}}"><input type="hidden" name="action" value="container_rename"><input type="hidden" name="lab" value="{{lab.id}}"><input type="hidden" name="user" value="{{u.name}}"><input type="hidden" name="expected_id" value="{{u.id}}"><input type="hidden" name="expected_started" value="{{u.started}}">
+<label>컨테이너 이름<input name="container_name" value="{{u.container}}" pattern="[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}" maxlength="63" required></label>
+<p><span>Docker 시작 호스트네임</span>: <code>{{u.hostname}}</code></p>
+<p class="muted">시작 호스트네임 변경은 환경 재생성이 필요합니다.</p>
+<label>연구실 ID 확인<input name="confirm" placeholder="{{lab.id}}" required></label><button {% if not lab.writable %}disabled{% endif %}>변경 검토</button>
+</form>{% endfor %}</section>
 <section class="card card-pad">
   <div class="blueprint-heading"><h2>연구실 재시작</h2><span class="badge">{{lab.users|length}} · 사용자</span></div>
   <p>연구실 전체의 접속과 실행 작업이 종료됩니다. 계정과 저장 파일은 유지됩니다.</p>

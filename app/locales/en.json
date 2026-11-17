@@ -855,5 +855,12 @@
   "개인 홈": "Personal home",
   "일반 계정은 본인 홈 폴더만 접근": "Standard accounts access only their own home directory",
   "전체 계정이 하나의 저장공간을 함께 사용": "All accounts share one storage allocation",
-  "단일 저장공간": "Single volume"
+  "단일 저장공간": "Single volume",
+  "컨테이너 이름": "Container name",
+  "관리 이름과 자동복구 연결을 함께 변경합니다. 계정·접속 포트·자료·실행 작업은 유지됩니다.": "Update the management name and recovery references while preserving accounts, ports, data and running processes.",
+  "무중단 이름 변경": "Rename without restart",
+  "컨테이너 이름과 관리 연결만 변경합니다. 호스트네임과 저장 경로는 변경하지 않습니다.": "Rename the container and management references only. Hostname and storage paths remain unchanged.",
+  "Docker 시작 호스트네임": "Docker startup hostname",
+  "시작 호스트네임 변경은 환경 재생성이 필요합니다.": "Changing the startup hostname requires container recreation.",
+  "컨테이너 이름과 관리 연결을 변경했습니다. 접속과 실행 작업은 유지됩니다.": "Container and management references renamed. Connections and running processes are preserved."
 }

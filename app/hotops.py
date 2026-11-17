@@ -76,6 +76,7 @@ def catalog():
                     name=u["name"],
                     profile=__import__("account_profile").public(u),
                     container=name(s, u),
+                    hostname=o["Config"].get("Hostname", ""),
                     cpu=h.get("NanoCpus", 0) / 1e9 or None,
                     ram=h.get("Memory", 0) / 1073741824 or None,
                     image=o["Config"]["Image"],
@@ -154,6 +155,9 @@ def catalog():
 
 
 def dispatch(req):
+    if req.get("action") == "container_rename":
+        return __import__("container_identity").rename(req)
+
     if req.get("action") == "lab_separate":
         return __import__("separate_migration").submit(req)
 
@@ -331,7 +335,8 @@ def dispatch(req):
         uid = int(run("docker", "exec", name(s, u), "id", "-u", new))
         c = cfg()
         c["labs"][req["lab"]]["users"].append(
-            dict(name=new, container=name(s, u), port=u["port"], uid=uid)
+            dict(name=new, container=name(s, u),
+                    hostname=o["Config"].get("Hostname", ""), port=u["port"], uid=uid)
         )
         save(ETC / "policy.json", c)
         return {"message": "컨테이너 내부 계정을 추가했습니다. 기존 계정은 유지됩니다."}
