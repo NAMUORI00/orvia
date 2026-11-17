@@ -91,6 +91,7 @@ def catalog():
                 id=key,
                 title=s["title"],
                 account_layout=s.get("account_layout", "separate"),
+                account_backend=s.get("account_backend", "bind_files"),
                 users=users,
                 writable=key in c["write_labs"],
                 fingerprint=__import__("reconfigure").fingerprint(

@@ -2,6 +2,7 @@
   <div><h2>연구실 구성원 <span class="badge">{{lab.users|length}}</span></h2><p>{{ '공용 컨테이너 · 동일한 SSH 포트' if current.account_layout == 'shared' else '계정별 컨테이너 · 개별 SSH 포트' }}</p></div>
   <label class="account-search"><span>계정 검색</span><input type="search" data-account-search placeholder="ID · 이름 · 학번" autocomplete="off"></label>
 </section>
+{% if current.account_backend == "native_etc" %}<p class="safe-edit">비밀번호 변경: 내부 passwd · 관리자 대시보드</p>{% endif %}
 <section class="account-card-grid" aria-label="연구실 구성원">
 {% for u in lab.users %}
 {% set runtime=(current.users|selectattr('name','equalto',u.name)|list|first) %}

@@ -57,6 +57,7 @@ def worker(req, job):
     paused = False
     active = False
     files = {}
+    native_deleted = False
     try:
         c, spec, user, obj = hotops.authorize(req)
         root, home = validate(req, spec, user, obj)
@@ -85,7 +86,10 @@ def worker(req, job):
             # Check again after the potentially long backup, before any deletion.
             validate(req, spec, user, hotops.obj(obj["Id"]))
             registered = False
-            if spec.get("account_layout") == "shared":
+            if spec.get('account_backend') == 'native_etc':
+                hotops.run('docker','exec',obj['Id'],'userdel',user['name'])
+                native_deleted = True
+            elif spec.get("account_layout") == "shared":
                 for key in ("shadow", "passwd", "group", "gshadow"):
                     path = admin / key
                     rows = []
@@ -119,8 +123,11 @@ def worker(req, job):
             job.update(state="complete", message="계정 백업 완료", backup=str(target))
     except Exception as error:
         if not registered:
-            for path, text in originals.items():
-                write_bound(path, text)
+            if native_deleted:
+                __import__('native_accounts').restore(obj['Id'], user['name'], originals)
+            elif spec.get('account_backend') != 'native_etc':
+                for path, text in originals.items():
+                    write_bound(path, text)
             if files:
                 recovery.restore(files)
         job.update(state="failed", message=str(error) if isinstance(error, ValueError) else "계정 작업을 완료하지 못했습니다. 백업과 작업 기록을 확인하세요.")

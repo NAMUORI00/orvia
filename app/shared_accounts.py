@@ -26,6 +26,10 @@ def password(req):
         raise ValueError("다른 관리 작업이 진행 중입니다.")
     try:
         c, spec, user, obj = hotops.authorize(req)
+        if spec.get('account_backend') == 'native_etc':
+            validate_shared(spec, obj)
+            __import__('native_accounts').set_password(obj['Id'], user['name'], value)
+            return {'message': '비밀번호를 변경했습니다. 내부 passwd와 동일하게 적용됩니다.'}
         root = pathlib.Path(spec["storage"]).resolve()
         path = root / user.get("credential_dir", ".admin/" + ("shared" if spec.get("account_layout") == "shared" else user["name"])) / "shadow"
         if not os.path.ismount(root) or path.is_symlink() or not path.resolve().is_relative_to(root):
@@ -66,9 +70,11 @@ def validate_shared(spec, obj):
         raise ValueError("연구실 영구 저장공간 연결을 확인하세요.")
     mounts = {m["Destination"]: m for m in obj["Mounts"]}
     expected = {"/home": root, **{"/etc/" + key: root / ".admin/shared" / key for key in DATABASES}}
+    if spec.get('account_backend') == 'native_etc':
+        expected = {'/home': root, '/etc': root / '.admin/shared/etc'}
     for target, source in expected.items():
         mount = mounts.get(target)
-        if not mount or pathlib.Path(mount["Source"]).resolve() != source or (target == "/home" and not mount["RW"]):
+        if not mount or pathlib.Path(mount["Source"]).resolve() != source or (target in ('/home', '/etc') and not mount["RW"]):
             raise ValueError("공용 컨테이너의 영구 계정·저장 연결이 일치하지 않습니다.")
     if not obj["State"]["Running"]:
         raise ValueError("연구실 컨테이너를 먼저 시작하세요.")
@@ -84,6 +90,8 @@ def submit(req):
     try:
         c, spec, source_user, obj = hotops.authorize(req)
         root = validate_shared(spec, obj)
+        if spec.get('account_backend') == 'native_etc':
+            return __import__('native_accounts').create(req, c, spec, source_user, obj)
         name = req.get("new_user", "")
         password = req.get("password", "")
         if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{1,30}", name) or not 8 <= len(password) <= 128 or any(ord(x) < 32 for x in password):

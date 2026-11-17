@@ -240,18 +240,7 @@ def operate(req):
             and isinstance(req.get("password"), str)
             and 10 <= len(req["password"]) <= 128
         ), "비밀번호는 10~128자입니다."
-        p = pathlib.Path(s["storage"]) / ".admin" / ("shared" if s.get("account_layout") == "shared" else user) / "shadow"
-        assert not p.is_symlink()
-        h = crypt.crypt(req["password"], crypt.mksalt(crypt.METHOD_SHA512))
-        with p.open("r+") as f:
-            rows = [r.split(":") for r in f.read().splitlines()]
-            assert sum(r[0] == user for r in rows) == 1
-            for r in rows:
-                if r[0] == user:
-                    r[1] = h
-            f.seek(0)
-            f.write("\n".join(":".join(r) for r in rows) + "\n")
-            f.truncate()
+        __import__("shared_accounts").password(dict(req, password_confirm=req["password"]))
     elif action in {"start", "stop"} and not s.get("sandbox"):
         assert user is None, (
             "기존 복구 서비스와 연동하려면 연구실 전체 작업을 선택하세요."

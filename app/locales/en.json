@@ -735,5 +735,8 @@
   "공용 전환 검토": "Review shared environment",
   "공용 환경 준비 중": "Preparing shared environment",
   "공용 컨테이너 전환 완료": "Shared container migration complete",
-  "연구실 공용 컨테이너 전환을 시작했습니다.": "Shared laboratory migration started."
+  "연구실 공용 컨테이너 전환을 시작했습니다.": "Shared laboratory migration started.",
+  "비밀번호를 변경했습니다. 내부 passwd와 동일하게 적용됩니다.": "Password updated. Container passwd and dashboard use the same account data.",
+  "비밀번호 변경: 내부 passwd · 관리자 대시보드": "Password changes: container passwd or administrator dashboard",
+  "공용 컨테이너에 계정을 추가했습니다. 재시작 없이 접속할 수 있습니다.": "Account added to the shared container. Login is available without a restart."
 }
