@@ -1,3 +1,51 @@
-{% extends 'base.html' %}{% block content %}
-<section class="page-head"><div><p class="eyebrow">LABORATORIES</p><h1>연구실</h1><p>관리할 연구실을 선택하세요.</p></div><a class="button" href="/provision">연구실 생성</a><a class="button secondary" href="/register">기존 환경 등록</a></section>
-<div class="settings-list">{% for lab in data.labs %}<a href="/labs/{{lab.id}}" class="settings-item"><span class="setting-icon">▦</span><div><strong>{{lab.title}}</strong><small>{{lab.users|length}}개 계정 · GPU {{lab.gpu}} · {{lab.storage_gb}} GB</small></div><span>›</span></a>{% endfor %}</div>{% endblock %}
+{% extends 'base.html' %}
+{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><span>연구실</span>{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">LABORATORIES</p>
+    <h1>연구실</h1>
+    <p>관리할 연구실을 선택하세요.</p>
+  </div>
+  <div class="twin-head-actions">
+    <a class="button secondary" href="/register">기존 환경 등록</a>
+    <a class="button" href="/provision">연구실 생성</a>
+  </div>
+</section>
+
+<section class="labs-card-grid">
+  {% for lab in data.labs %}
+  {% set gpus = lab.gpu_indices or [lab.gpu] %}
+  {% set running_cnt = lab.users|selectattr('status','equalto','running')|list|length %}
+  <article class="lab-dir-card">
+    <div class="lab-dir-top">
+      <img class="lab-dir-art" src="/static/models/laboratory.svg" alt="">
+      <div class="lab-dir-meta">
+        <div class="lab-dir-head">
+          <h2><a href="/labs/{{lab.id}}">{{lab.title}}</a></h2>
+          <span class="badge {{'running' if lab.writable else ''}}">{{ '편집 허용' if lab.writable else '조회 전용' }}</span>
+        </div>
+        <p class="lab-dir-specs">
+          <span>GPU {{gpus|join(', ')}}</span>
+          <span>·</span>
+          <span>{{lab.users|length}}<span>개 계정</span></span>
+          <span>({{running_cnt}} <span>실행 중</span>)</span>
+        </p>
+      </div>
+    </div>
+    <div class="lab-dir-storage">
+      <div class="lab-dir-storage-head">
+        <span>공유 저장공간</span>
+        <strong>{{lab.used_gb}} / {{lab.storage_gb}} GB</strong>
+      </div>
+      <progress value="{{lab.used_gb}}" max="{{lab.storage_gb or 1}}" aria-label="저장공간 사용량"></progress>
+    </div>
+    <div class="lab-dir-actions">
+      <a class="button btn-sm" href="/labs/{{lab.id}}">상세 설정</a>
+      <a class="button secondary btn-sm" href="/labs/{{lab.id}}/accounts">계정 관리</a>
+      <a class="button secondary btn-sm" href="/?lab={{lab.id}}">배치도에서 열기</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

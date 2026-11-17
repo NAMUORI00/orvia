@@ -116,7 +116,7 @@ def snapshot():
                     name=u["name"],
                     profile=__import__("account_profile").public(u),
                     port=u["port"],
-                    status=obj["State"]["Status"] if obj else "未作成",
+                    status=obj["State"]["Status"] if obj else "not_created",
                     started=obj["State"]["StartedAt"] if obj else "",
                     container=u.get("container", s["prefix"] + u["name"]),
                 )

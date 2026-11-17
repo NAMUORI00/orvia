@@ -139,7 +139,6 @@
       const target = document.getElementById(kind + "-drop");
       if (choice) {
         target.textContent =
-          (kind === "image" ? "▣ " : "▥ ") +
           choice.closest("label").querySelector("strong").textContent +
           " · " +
           tr("선택됨");
@@ -299,7 +298,7 @@
               line.className = "provision-job";
               const symbol = document.createElement("span");
               symbol.className = "job-symbol";
-              symbol.textContent = job.state === "complete" ? "✓" : job.state === "failed" ? "!" : "◷";
+              symbol.textContent = job.state === "complete" ? "✓" : job.state === "failed" ? "!" : "…";
               symbol.setAttribute("aria-hidden", "true");
               const body = document.createElement("div"), title = document.createElement("strong"), detail = document.createElement("small");
               title.textContent = job.lab + " · " + tr(job.state);

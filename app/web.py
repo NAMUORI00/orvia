@@ -79,7 +79,7 @@ def headers(res):
 
 @app.route("/healthz")
 def health():
-    return jsonify(status="ok", version="0.7.4")
+    return jsonify(status="ok", version="0.7.5")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -121,7 +121,17 @@ def home():
         data = call({"action": "status"})
     except (OSError, ValueError):
         return render_template("unavailable.html"), 503
-    return render_template("home.html", data=data)
+    try:
+        catalog = call({"action": "catalog"})
+    except (OSError, ValueError):
+        catalog = {"labs": [], "jobs": [], "storage_limit": 100}
+    try:
+        provision_info = call({"action": "provision_plans"})
+    except (OSError, ValueError):
+        provision_info = {"storage_max_gb": catalog.get("storage_limit", 1000)}
+    return render_template(
+        "home.html", data=data, catalog=catalog, provision_info=provision_info
+    )
 
 
 @app.get("/api/status")
@@ -139,6 +149,11 @@ def action():
         flash(call(data)["message"], "success")
     except (OSError, ValueError) as e:
         flash(str(e), "error")
+    next_url = request.form.get("next", "")
+    if next_url:
+        from i18n import return_path
+
+        return redirect(return_path(next_url, request.host))
     return redirect(url_for("lab_page", lab_id=data["lab"], section="storage"))
 
 
@@ -282,14 +297,20 @@ def provision_page():
         return redirect("/provision")
     data = call({"action": "status"})
     used = {i for l in data["labs"] for i in l.get("gpu_indices", [l["gpu"]])}
+    requested_gpu = request.args.get("gpu", "")
     default_gpu = next(
-        (
-            g["index"]
-            for g in sorted(data["gpus"], key=lambda g: -g["index"])
-            if g["index"] not in used and not g["util"] and g["used"] <= 32
-        ),
+        (g["index"] for g in data["gpus"] if str(g["index"]) == requested_gpu),
         None,
     )
+    if default_gpu is None:
+        default_gpu = next(
+            (
+                g["index"]
+                for g in sorted(data["gpus"], key=lambda g: -g["index"])
+                if g["index"] not in used and not g["util"] and g["used"] <= 32
+            ),
+            None,
+        )
     return render_template(
         "provision.html",
         changes=call({"action": "provision_plans"}),
@@ -386,6 +407,7 @@ def hot_action():
         "permission_profile",
         "storage",
         "gpu_selection",
+        "scope",
     ]
     req = {k: request.form.get(k) for k in fields}
     if req.get("action") == "gpu_reconfigure":
@@ -394,6 +416,11 @@ def hot_action():
         flash(call(req)["message"], "success")
     except (ValueError, OSError) as e:
         flash(str(e), "error")
+    next_url = request.form.get("next", "")
+    if next_url:
+        from i18n import return_path
+
+        return redirect(return_path(next_url, request.host))
     target = {
         "account_metadata": "accounts",
         "account_create": "accounts",
@@ -471,10 +498,12 @@ def document_defaults():
 
 @app.context_processor
 def language_options():
-    from i18n import TRANSLATIONS
+    from i18n import TRANSLATIONS, language
 
     return {
         "permission_profiles": __import__("permissions").CATALOG["profiles"],
+        "current_language": language(),
+        "access_host": settings.get("access_host", ""),
         "languages": {
             code: phrases.get("_language_name", code)
             for code, phrases in TRANSLATIONS.items()

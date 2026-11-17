@@ -1,4 +1,6 @@
-{% extends 'base.html' %}{% block content %}
+{% extends 'base.html' %}
+{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><span>이용 안내서</span>{% endblock %}
+{% block content %}
 <section class="page-head">
   <div>
     <p class="eyebrow">DOCUMENTS</p>
@@ -19,9 +21,9 @@
     </div>
     <h2>{{item.title}}</h2>
     <div class="manual-resource-tags">
-      <span>♙ {{item.users|length}} · 사용자</span
-      ><span>▥ {{(item.gpu_indices or [item.gpu])|length}} · GPU</span
-      ><span>▤ {{item.storage_gb}} GB</span>
+      <span>{{item.users|length}} · 사용자</span
+      ><span>{{(item.gpu_indices or [item.gpu])|length}} · GPU</span
+      ><span>{{item.storage_gb}} GB</span>
     </div> </a
   >{% endfor %}
 </section>

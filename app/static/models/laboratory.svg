@@ -1,13 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160" fill="none">
-<ellipse cx="114" cy="140" rx="92" ry="15" fill="#233e50" opacity=".09"/>
-<path d="M16 100 109 47 207 101 112 155Z" fill="#ccdce3"/><path d="M16 93 109 40 207 94 112 148Z" fill="#f7fbfd" stroke="#c2d5df"/>
-<path d="M16 93V39L109 5V40Z" fill="#d4e5ee"/><path d="M109 5 207 59V94L109 40Z" fill="#e8f1f6"/>
-<path d="M29 44 91 20V49L29 80Z" fill="#9ebccc"/><path d="M33 46 87 26V47L33 74Z" fill="#cceaf3"/><path d="M60 36V60" stroke="#fff" stroke-width="3"/>
-<path d="M43 96V116M117 94V126M148 78V109" stroke="#7d99a9" stroke-width="5"/>
-<path d="M34 91 75 68 155 109 115 133Z" fill="#b7cbd6"/><path d="M34 85 75 62 155 103 115 127Z" fill="#fff" stroke="#c4d5de"/>
-<path d="M69 62 104 81V108L69 89Z" fill="#284b61"/><path d="M73 68 100 83V100L73 85Z" fill="#60c8c0"/><path d="M79 83 85 79 92 88 97 87" stroke="#e6fffa" stroke-width="2"/>
-<path d="M85 102V109L95 114 104 110" stroke="#6a8b9b" stroke-width="3"/><path d="M108 108 124 99 138 107 123 116Z" fill="#c1d9e3"/>
-<path d="M155 60 176 48 195 59V106L174 119 155 108Z" fill="#829ead"/><path d="M155 60 174 71 195 59 176 48Z" fill="#c6dce6"/><path d="M174 71V119L195 106V59Z" fill="#436275"/>
-<path d="m178 79 12-7m-12 19 12-7m-12 19 12-7" stroke="#b8d3df" stroke-width="3"/><circle cx="184" cy="105" r="2" fill="#7ce8c4"/>
-<path d="M43 110 62 100 80 111 61 123Z" fill="#81a0b1"/><path d="M43 110V126L61 137V123Z" fill="#a8c1cf"/><path d="M61 123 80 111V127L61 137Z" fill="#6c8fa3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" fill="none">
+  <polygon points="18,86 80,108 142,86 80,64" fill="#0f172a" fill-opacity="0.06"/>
+  <!-- Shared NVMe Storage Base Slab -->
+  <path d="M80 48 L138 68 L80 88 L22 68 Z" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M22 68 L80 88 L80 104 L22 84 Z" fill="#dce5ed" stroke="#94a3b8" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M80 88 L138 68 L138 84 L80 104 Z" fill="#94a3b8" stroke="#64748b" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M31 76.5 L41 80 M47 82 L57 85.5 M63 87.5 L73 91" stroke="#117c6a" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M90 89 L128 76 M90 95 L128 82" stroke="#475569" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Bus Link Pillars -->
+  <path d="M68 57 L68 67 M80 61 L80 71 M92 57 L92 67" stroke="#117c6a" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="80" cy="67" r="2.2" fill="#4bd0ae"/>
+  <!-- Elevated Isolated Container Compute Prism -->
+  <path d="M80 14 L118 27 L80 40 L42 27 Z" fill="#ffffff" stroke="#64748b" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M80 20 L102 27 L80 34 L58 27 Z" fill="#e6f4f0" stroke="#117c6a" stroke-width="1"/>
+  <path d="M42 27 L80 40 L80 64 L42 51 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M42 33 L80 46" stroke="#117c6a" stroke-width="1.6"/>
+  <circle cx="50" cy="43" r="2" fill="#4bd0ae"/>
+  <path d="M58 46 L73 51 M58 51 L73 56" stroke="#64748b" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M80 40 L118 27 L118 51 L80 64 Z" fill="#1e293b" stroke="#334155" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M88 45 L110 37.5 M88 50.5 L110 43 M88 56 L110 48.5" stroke="#4bd0ae" stroke-width="1.5" stroke-linecap="round"/>
 </svg>

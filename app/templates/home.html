@@ -1,14 +1,98 @@
-{% extends 'base.html' %}{% block content %}
-<section class="page-head"><div><p class="eyebrow">ORVIA</p><h1>서버 현황</h1></div><a class="button" href="/provision">연구실 생성</a></section>
-<div class="twin-metrics"><div><span>연구실</span><strong id="twin-labs">{{data.labs|length}}</strong></div><div><span>사용자</span><strong id="twin-users">{{data.labs|map(attribute='users')|map('length')|sum}}</strong></div><div><span>미배정 GPU</span><strong id="twin-free">—</strong></div><div><span>시스템 메모리</span><progress id="twin-memory" max="{{data.memory_total_gib}}" value="{{data.memory_used_gib}}" tabindex="0" aria-label="시스템 메모리"></progress></div><div class="twin-sync"><span id="twin-sync">실시간 동기화</span><small id="twin-time">{{data.updated}}</small></div></div>
-<section class="twin-workspace" id="twin" data-state='{{data|tojson}}'>
-<div class="twin-map" id="twin-map"><div class="twin-map-head"><h2>자원 배치도</h2><div class="map-tools"><span>● 배정 · ○ 미배정</span><button id="twin-reset" type="button">전체 자원</button></div></div>
-<svg class="twin-wires" id="twin-wires" aria-hidden="true"></svg>
-<div class="twin-rack"><svg class="rack-roof" viewBox="0 0 240 65" aria-hidden="true"><path d="M0 33 175 0 240 30 65 65Z" fill="#bed0da"/></svg><div class="rack-face"><div class="rack-brand"><span class="rack-power"></span> GPU SERVER <span class="rack-vents" aria-hidden="true">▥▥▥</span></div><div id="twin-gpus"></div><div class="rack-base"><span>CPU 스레드</span><strong>{{data.cpu_count}}</strong><span>시스템 메모리</span><strong>{{data.memory_total_gib}} GiB</strong></div></div></div>
-<div class="twin-map-caption">GPU 서버 → 연구실 · 사용자 · 공유 저장공간</div><div class="twin-laboratories" id="twin-laboratories"></div>
+{% extends 'base.html' %}
+{% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><span>서버 현황</span>{% endblock %}
+{% block topbar_tools %}<button type="button" class="secondary help-toggle-btn" data-help-toggle aria-expanded="false"><span>?</span><span>화면 도움말</span></button>{% endblock %}
+{% block help_banner %}
+<div id="help-banner" class="help-banner" hidden>
+  <p><strong>빠른 안내:</strong> <span>1) 미배정 GPU의 + 배정을 누르거나 연결 단자를 끌어 연구실에 배정하세요. 2) 연구실 카드를 누르면 오른쪽에 관리 창이 열리며, 다른 연구실도 바로 눌러 비교할 수 있습니다.</span></p>
+  <button type="button" class="secondary btn-sm" data-help-close>닫기</button>
 </div>
-<aside class="twin-detail" aria-label="선택 상세"><div id="twin-detail"><div class="twin-empty"><img class="empty-model" src="/static/models/laboratory.svg" alt=""><h2>자원 연결</h2><p>연구실 또는 GPU 선택 후 상세 정보와 관리 항목을 확인할 수 있습니다.</p></div></div></aside>
+{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">ORVIA</p>
+    <h1>서버 현황</h1>
+  </div>
+  <div class="twin-head-actions">
+    <div class="sync-pill"><span class="dot" aria-hidden="true"></span><span id="twin-sync">실시간 동기화</span><small id="twin-time">{{data.updated}}</small></div>
+    <a class="button" href="/provision" id="twin-open-create">연구실 생성</a>
+  </div>
 </section>
-<noscript><a href="/labs">연구실 관리</a></noscript>
-<script defer src="/static/visual-metrics.js"></script><script defer src="/static/twin.js"></script>
+
+<div class="twin-metrics-v2">
+  <div class="kpi-chip">
+    <span>연구실</span>
+    <strong id="twin-labs">{{data.labs|length}}</strong>
+  </div>
+  <div class="kpi-chip">
+    <span>계정</span>
+    <div><strong id="twin-users">{{data.labs|map(attribute='users')|map('length')|sum}}</strong><small id="twin-users-live"></small></div>
+  </div>
+  <div class="kpi-chip">
+    <span>미배정 GPU</span>
+    <div><strong id="twin-free" class="kpi-teal">—</strong><small>/ {{data.gpus|length}} GPU</small></div>
+  </div>
+  <div class="kpi-chip kpi-wide">
+    <div><span>공유 저장공간</span><strong id="twin-storage-text">—</strong></div>
+    <div class="kpi-divider" aria-hidden="true"></div>
+    <div><span>시스템 메모리</span><strong id="twin-memory-text">{{data.memory_used_gib}} / {{data.memory_total_gib}} GiB</strong></div>
+  </div>
+</div>
+
+<section class="twin-workspace" id="twin"
+  data-state='{{data|tojson}}'
+  data-catalog='{{catalog|tojson}}'
+  data-csrf="{{session.csrf}}"
+  data-access-host="{{access_host}}"
+  data-storage-max="{{provision_info.storage_max_gb or catalog.storage_limit or 1000}}">
+  <div class="twin-map" id="twin-map">
+    <div class="twin-map-head">
+      <div class="twin-map-title">
+        <h2>자원 배치도</h2>
+        <span class="map-legend-inline">연결된 연구실 카드 선택 시 우측 패널에서 바로 관리</span>
+      </div>
+      <div class="map-tools">
+        <button id="twin-reset" type="button" class="secondary btn-sm">전체 보기</button>
+      </div>
+    </div>
+
+    <div id="twin-pending-bar" class="pending-wire-bar" hidden>
+      <span id="twin-pending-label"></span>
+      <button type="button" id="twin-pending-clear" class="pending-btn-muted">초기화</button>
+      <button type="button" id="twin-pending-apply" class="pending-btn-teal">배정 화면 열기</button>
+    </div>
+
+    <svg class="twin-wires" id="twin-wires" aria-hidden="true"></svg>
+
+    <div class="twin-stage-grid">
+      <div class="host-card-25d">
+        <div class="host-head">
+          <div>
+            <span class="host-eyebrow">HOST SERVER</span>
+            <h3>{{ data.gpus[0].name if data.gpus else 'GPU Server' }}</h3>
+          </div>
+          <span class="badge running">정상</span>
+        </div>
+        <div class="host-model-wrap">
+          <img class="host-model-svg" src="/static/models/dgx-h200.svg" alt="">
+        </div>
+        <div id="twin-gpus" class="gpu-slot-list"></div>
+        <div class="host-specs">
+          <div><span>CPU 스레드</span><strong>{{data.cpu_count}}</strong></div>
+          <div><span>시스템 메모리</span><strong id="twin-host-ram">{{data.memory_used_gib}} / {{data.memory_total_gib}} GiB</strong></div>
+        </div>
+      </div>
+
+      <div class="twin-laboratories" id="twin-laboratories"></div>
+    </div>
+
+    <p class="twin-map-caption">미배정 GPU는 + 배정 버튼 또는 연결 단자를 끌어 연구실에 연결할 수 있습니다.</p>
+  </div>
+
+  <aside class="twin-detail" id="twin-panel" aria-label="선택 상세" hidden></aside>
+</section>
+
+<noscript><a class="button" href="/labs">연구실 관리</a></noscript>
+<script defer src="/static/visual-metrics.js"></script>
+<script defer src="/static/twin.js"></script>
 {% endblock %}

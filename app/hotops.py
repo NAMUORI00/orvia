@@ -234,6 +234,8 @@ def dispatch(req):
         profiles[lab] = item
         save(p, profiles)
         return {"message": "프리셋을 저장했습니다. 실행 환경은 변경하지 않았습니다."}
+    if req.get("action") == "resources" and req.get("scope") == "all":
+        return _apply_lab_resources(req)
     c, s, u, o = authorize(req)
     if req["action"] == "maintenance_recreate":
         import maintenance
@@ -266,120 +268,8 @@ def dispatch(req):
         finally:
             JOB_LOCK.release()
     if req["action"] == "resources":
-        cpu = float(req.get("cpu", 0))
-        ram = int(req.get("ram", 0))
-        total = (
-            int(
-                next(
-                    l.split()[1]
-                    for l in pathlib.Path("/proc/meminfo").read_text().splitlines()
-                    if l.startswith("MemTotal:")
-                )
-            )
-            // 1048576
-        )
-        if not (cpu == 0 or 0.25 <= cpu <= os.cpu_count()) or not (
-            ram == 0 or 1 <= ram <= total
-        ):
-            raise ValueError("자원 한도를 확인하세요.")
-        oldram = o["HostConfig"].get("Memory", 0)
-        releasing = (
-            cpu == 0
-            and (
-                o["HostConfig"].get("NanoCpus", 0)
-                or o["HostConfig"].get("CpuQuota", 0) > 0
-            )
-        ) or (ram == 0 and oldram > 0)
-        if releasing:
-            if req.get("ack_downtime") != "yes":
-                raise ValueError(
-                    "자원 한도 해제에는 사용자 환경 재생성 확인이 필요합니다."
-                )
-            import maintenance
-
-            approved = dict(
-                req,
-                ack_recreate="yes",
-                expected_id=o["Id"][:12],
-                expected_started=o["State"]["StartedAt"],
-            )
-            maintenance.recreate(
-                approved,
-                c,
-                s,
-                u,
-                o,
-                resource_limits=dict(
-                    NanoCpus=int(cpu * 1e9),
-                    CpuQuota=0,
-                    CpuPeriod=0,
-                    Memory=ram * 1073741824,
-                    MemorySwap=ram * 1073741824 if ram else -1,
-                ),
-            )
-            return {"message": "CPU·메모리 한도를 적용했습니다."}
-        shrinking = bool(
-            o["State"]["Running"] and ram and (oldram == 0 or ram * 1073741824 < oldram)
-        )
-        if shrinking and req.get("ack_downtime") != "yes":
-            raise ValueError(
-                "메모리 한도 축소에는 사용자 환경 재시작 확인이 필요합니다."
-            )
-        if not JOB_LOCK.acquire(blocking=False):
-            raise ValueError("다른 관리 작업이 진행 중입니다.")
-        import recovery
-
-        active = False
-        paused = False
-        stopped = False
-
-        def limits(cpus, memory, swap):
-            run(
-                "docker",
-                "update",
-                "--cpus",
-                str(cpus),
-                "--memory",
-                str(memory),
-                "--memory-swap",
-                str(swap),
-                name(s, u),
-            )
-
-        try:
-            if shrinking:
-                active = recovery.pause(s)
-                paused = True
-                run("docker", "stop", "-t", "15", name(s, u))
-                stopped = True
-            limits(cpu, ram * 1073741824, ram * 1073741824 if ram else -1)
-            if stopped:
-                run("docker", "start", name(s, u))
-            after = obj(name(s, u))
-            if after["Id"] != o["Id"] or __import__("maintenance").mount_signature(
-                after
-            ) != __import__("maintenance").mount_signature(o):
-                raise ValueError("환경 상태가 변경되었습니다.")
-            if not shrinking and after["State"]["StartedAt"] != o["State"]["StartedAt"]:
-                raise ValueError("환경 실행 상태가 변경되었습니다.")
-            return {"message": "CPU·메모리 한도를 적용했습니다."}
-        except Exception:
-            if stopped:
-                if obj(name(s, u))["State"]["Running"]:
-                    run("docker", "stop", "-t", "15", name(s, u))
-                limits(
-                    o["HostConfig"].get("NanoCpus", 0) / 1e9,
-                    oldram,
-                    o["HostConfig"].get("MemorySwap", 0),
-                )
-                run("docker", "start", name(s, u))
-            raise
-        finally:
-            try:
-                if paused:
-                    recovery.resume(s, active)
-            finally:
-                JOB_LOCK.release()
+        cpu, ram = _parse_resource_bounds(req)
+        return _apply_container_resources(req, c, s, u, o, cpu, ram)
     if req["action"] == "adduser":
         if o["HostConfig"]["ReadonlyRootfs"]:
             raise ValueError(
@@ -589,6 +479,171 @@ def register(req):
     return {
         "message": "기존 환경을 연구실로 등록했습니다. 컨테이너는 변경하지 않았습니다."
     }
+
+
+def _parse_resource_bounds(req):
+    cpu = float(req.get("cpu", 0))
+    ram = int(req.get("ram", 0))
+    total = (
+        int(
+            next(
+                l.split()[1]
+                for l in pathlib.Path("/proc/meminfo").read_text().splitlines()
+                if l.startswith("MemTotal:")
+            )
+        )
+        // 1048576
+    )
+    if not (cpu == 0 or 0.25 <= cpu <= os.cpu_count()) or not (
+        ram == 0 or 1 <= ram <= total
+    ):
+        raise ValueError("자원 한도를 확인하세요.")
+    return cpu, ram
+
+
+def _resource_transition_flags(o, cpu, ram):
+    oldram = o["HostConfig"].get("Memory", 0)
+    releasing = (
+        cpu == 0
+        and (
+            o["HostConfig"].get("NanoCpus", 0)
+            or o["HostConfig"].get("CpuQuota", 0) > 0
+        )
+    ) or (ram == 0 and oldram > 0)
+    shrinking = bool(
+        o.get("State", {}).get("Running")
+        and ram
+        and (oldram == 0 or ram * 1073741824 < oldram)
+    )
+    return oldram, releasing, shrinking
+
+
+def _apply_container_resources(req, c, s, u, o, cpu, ram):
+    oldram, releasing, shrinking = _resource_transition_flags(o, cpu, ram)
+    if releasing:
+        if req.get("ack_downtime") != "yes":
+            raise ValueError(
+                "자원 한도 해제에는 사용자 환경 재생성 확인이 필요합니다."
+            )
+        import maintenance
+
+        approved = dict(
+            req,
+            ack_recreate="yes",
+            expected_id=o["Id"][:12],
+            expected_started=o["State"]["StartedAt"],
+        )
+        maintenance.recreate(
+            approved,
+            c,
+            s,
+            u,
+            o,
+            resource_limits=dict(
+                NanoCpus=int(cpu * 1e9),
+                CpuQuota=0,
+                CpuPeriod=0,
+                Memory=ram * 1073741824,
+                MemorySwap=ram * 1073741824 if ram else -1,
+            ),
+        )
+        return {"message": "CPU·메모리 한도를 적용했습니다."}
+    if shrinking and req.get("ack_downtime") != "yes":
+        raise ValueError(
+            "메모리 한도 축소에는 사용자 환경 재시작 확인이 필요합니다."
+        )
+    if not JOB_LOCK.acquire(blocking=False):
+        raise ValueError("다른 관리 작업이 진행 중입니다.")
+    import recovery
+
+    active = False
+    paused = False
+    stopped = False
+
+    def limits(cpus, memory, swap):
+        run(
+            "docker",
+            "update",
+            "--cpus",
+            str(cpus),
+            "--memory",
+            str(memory),
+            "--memory-swap",
+            str(swap),
+            name(s, u),
+        )
+
+    try:
+        if shrinking:
+            active = recovery.pause(s)
+            paused = True
+            run("docker", "stop", "-t", "15", name(s, u))
+            stopped = True
+        limits(cpu, ram * 1073741824, ram * 1073741824 if ram else -1)
+        if stopped:
+            run("docker", "start", name(s, u))
+        after = obj(name(s, u))
+        if after["Id"] != o["Id"] or __import__("maintenance").mount_signature(
+            after
+        ) != __import__("maintenance").mount_signature(o):
+            raise ValueError("환경 상태가 변경되었습니다.")
+        if not shrinking and after["State"]["StartedAt"] != o["State"]["StartedAt"]:
+            raise ValueError("환경 실행 상태가 변경되었습니다.")
+        return {"message": "CPU·메모리 한도를 적용했습니다."}
+    except Exception:
+        if stopped:
+            if obj(name(s, u))["State"]["Running"]:
+                run("docker", "stop", "-t", "15", name(s, u))
+            limits(
+                o["HostConfig"].get("NanoCpus", 0) / 1e9,
+                oldram,
+                o["HostConfig"].get("MemorySwap", 0),
+            )
+            run("docker", "start", name(s, u))
+        raise
+    finally:
+        try:
+            if paused:
+                recovery.resume(s, active)
+        finally:
+            JOB_LOCK.release()
+
+
+def _apply_lab_resources(req):
+    c = cfg()
+    lab = req.get("lab")
+    s = c["labs"].get(lab)
+    if not s or lab not in c["write_labs"]:
+        raise PermissionError("이 연구실은 현재 변경 보호 대상입니다.")
+    if req.get("confirm") != lab:
+        raise ValueError("연구실 ID를 입력하여 확인하세요.")
+    cpu, ram = _parse_resource_bounds(req)
+    targets = []
+    seen = set()
+    for member in s.get("users", []):
+        cname = name(s, member)
+        if cname in seen:
+            continue
+        seen.add(cname)
+        _, _, u_obj, o_obj = authorize(dict(req, user=member["name"]))
+        targets.append((u_obj, o_obj))
+    if not targets:
+        raise ValueError("계정을 선택하세요.")
+    for _, o_obj in targets:
+        _, releasing, shrinking = _resource_transition_flags(o_obj, cpu, ram)
+        if releasing and req.get("ack_downtime") != "yes":
+            raise ValueError(
+                "자원 한도 해제에는 사용자 환경 재생성 확인이 필요합니다."
+            )
+        if shrinking and req.get("ack_downtime") != "yes":
+            raise ValueError(
+                "메모리 한도 축소에는 사용자 환경 재시작 확인이 필요합니다."
+            )
+    for u_obj, o_obj in targets:
+        _apply_container_resources(
+            dict(req, user=u_obj["name"]), c, s, u_obj, o_obj, cpu, ram
+        )
+    return {"message": "연구실 전체 계정의 CPU·메모리 한도를 적용했습니다."}
 
 
 def build_source(image):

@@ -5,7 +5,8 @@ from flask import request, session
 
 ROOT = pathlib.Path(__file__).parent / "locales"
 TRANSLATIONS = {
-    p.stem: json.loads(p.read_text(encoding="utf-8-sig")) for p in ROOT.glob("*.json")
+    p.stem: json.loads(p.read_text(encoding="utf-8-sig"))
+    for p in sorted(ROOT.glob("*.json"), key=lambda p: (p.stem != "ko", p.stem))
 }
 
 
@@ -62,7 +63,14 @@ class LocalizedHTML(HTMLParser):
             self.skip = max(0, self.skip - 1)
 
     def handle_startendtag(self, tag, attrs):
-        self.parts.append(self.get_starttag_text())
+        raw = self.get_starttag_text()
+        for k, v in attrs:
+            if k in ("placeholder", "aria-label", "title") and v:
+                raw = raw.replace(
+                    k + '="' + v + '"',
+                    k + '="' + escape(translate(v, self.lang), quote=True) + '"',
+                )
+        self.parts.append(raw)
 
     def handle_data(self, data):
         self.parts.append(data if self.skip else translate(data, self.lang))
