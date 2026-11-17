@@ -151,6 +151,10 @@ class LatestUsageTests(unittest.TestCase):
             self.assertEqual([a["user"] for a in result["accounts"]],["alice"])
             self.assertEqual(result["accounts"][0]["cpu"],125)
             self.assertNotIn("processes",result["accounts"][0])
+            self.assertIsNone(result["cpu_util"])
+            with telemetry.database() as c:
+                c.execute("INSERT INTO samples VALUES(?,?)", (3, json.dumps({"ts":3, "cpu_count":32, "cpu_util":75, "accounts":[{"lab":"a", "user":"alice", "cpu":125}]})))
+            self.assertEqual(telemetry.latest_lab("a")["cpu_util"],75)
             with self.assertRaises(ValueError):telemetry.latest_lab("unknown")
 
     def test_missing_sample_remains_unknown(self):

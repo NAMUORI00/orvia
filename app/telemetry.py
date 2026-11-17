@@ -431,5 +431,5 @@ def latest_lab(lab):
     if not row:
         return dict(ts=None, cpu_count=None, memory_total=None, accounts=[])
     data = json.loads(row[0])
-    return dict(ts=data["ts"], cpu_count=data.get("cpu_count"), memory_total=data.get("memory_total"), shared=data.get("shared_totals", {}).get(lab),
+    return dict(ts=data["ts"], cpu_count=data.get("cpu_count"), cpu_util=data.get("cpu_util"), memory_total=data.get("memory_total"), shared=data.get("shared_totals", {}).get(lab),
         accounts=[{k:a.get(k) for k in ("user","running","cpu","memory")} for a in data.get("accounts",[]) if a["lab"]==lab and a["user"] in names])

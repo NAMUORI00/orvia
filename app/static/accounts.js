@@ -3,7 +3,7 @@
   const search = document.querySelector("[data-account-search]");
   const cards = [...document.querySelectorAll("[data-account-card]")];
   const grid = document.querySelector(".account-card-grid");
-  const hostAddr = grid?.dataset.accessHost || location.hostname;
+  const hostAddr = grid?.dataset.accessHost || document.querySelector("[data-access-host]")?.dataset.accessHost || location.hostname;
 
   search?.addEventListener("input", () => {
     const query = search.value.trim().toLocaleLowerCase();

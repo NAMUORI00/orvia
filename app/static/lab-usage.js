@@ -156,9 +156,11 @@
         : (memory / 1024 ** 3).toFixed(2) + " GiB",
     );
     const hostFreeCpu = document.querySelector("[data-host-free-cpu]");
-    if (hostFreeCpu && known && data.cpu_count > 0) {
-      const rem = Math.max(0, data.cpu_count - cpu);
-      hostFreeCpu.textContent = "(" + t("여유") + " " + rem.toFixed(1) + "c)";
+    if (hostFreeCpu) {
+      const rem = !stale && data.cpu_util != null && data.cpu_count > 0
+        ? Math.max(0, data.cpu_count * (1 - data.cpu_util / 100))
+        : null;
+      hostFreeCpu.textContent = rem == null ? "N/A" : "(" + t("여유") + " " + rem.toFixed(1) + "c)";
     }
   }
   async function refresh() {
