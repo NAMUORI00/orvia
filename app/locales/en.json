@@ -925,5 +925,8 @@
   "주의": "High",
   "활발": "Active",
   "쾌적": "Healthy",
-  "여유": "Idle"
+  "여유": "Idle",
+  "개별 집계 미지원": "Per-user metrics unavailable",
+  "공용 컨테이너 전체 사용량": "Shared container usage",
+  "측정 시점 전송률": "Transfer rate at sample time"
 }

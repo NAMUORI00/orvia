@@ -183,6 +183,23 @@
       ? values.reduce((a, b) => a + b, 0)
       : null;
   }
+  function sharedLab(lab) {
+    return Boolean(data.latest.shared_totals?.[lab]) ||
+      data.latest.accounts.some((a) => a.lab === lab && a.scope === "shared_container");
+  }
+  function labResourceAccounts(lab) {
+    if (sharedLab(lab)) {
+      const shared = data.latest.shared_totals?.[lab];
+      return shared ? [shared] : [];
+    }
+    return data.latest.accounts.filter((a) => a.lab === lab);
+  }
+  function sharedNetworkText(lab) {
+    const shared = data.latest.shared_totals?.[lab];
+    const rates = shared?.rates;
+    return t("측정 시점 전송률") + " · " + t("수신") + " " +
+      size(rates?.rx) + "/s · " + t("송신") + " " + size(rates?.tx) + "/s";
+  }
   function meter(parent, label, value, max, format, extra = "") {
     const box = node("div", "", "resource-meter");
     box.append(node("span", t(label)));
@@ -372,6 +389,8 @@
       };
 
       const accounts = d.accounts.filter((a) => a.lab === s.lab);
+      const resourceAccounts = labResourceAccounts(s.lab);
+      const shared = sharedLab(s.lab);
       const runningCnt = accounts.filter((a) => a.running).length;
       const gpus = d.gpus.filter((g) => (s.gpu_indices || []).includes(g.index));
 
@@ -394,17 +413,18 @@
       );
       head.append(titleWrap, node("span", "›"));
       card.append(head);
+      if (shared) card.append(node("p", t("공용 컨테이너 전체 사용량"), "muted"));
 
       const gpuPct =
         gpus.length && gpus.every((g) => g.util != null)
           ? sumKnown(gpus.map((g) => g.util)) / gpus.length
           : null;
       const cpuSum = sumKnown(
-        accounts.map((a) => (a.running ? (a.cpu == null ? null : a.cpu / 100) : 0)),
+        resourceAccounts.map((a) => (a.running ? (a.cpu == null ? null : a.cpu / 100) : 0)),
       );
       const cpuPct = cpuSum != null && d.cpu_count > 0 ? (cpuSum / d.cpu_count) * 100 : null;
       const ramSum = sumKnown(
-        accounts.map((a) => (a.running ? memoryBytes(a.memory) : 0)),
+        resourceAccounts.map((a) => (a.running ? memoryBytes(a.memory) : 0)),
       );
       const ramPct = ramSum != null && d.memory_total > 0 ? (ramSum / d.memory_total) * 100 : null;
       const diskPct = s.used != null && s.capacity > 0 ? (s.used / s.capacity) * 100 : null;
@@ -426,7 +446,7 @@
         buildMiniRing(
           ramPct,
           "메모리",
-          ramSum == null ? "N/A" : (ramSum / 1073741824).toFixed(0) + "G",
+          ramSum == null ? "N/A" : shared ? size(ramSum) : (ramSum / 1073741824).toFixed(0) + "G",
           "is-purple",
         ),
         buildMiniRing(
@@ -446,7 +466,7 @@
       const linkRow = node("div", "", "cockpit-card-link-row");
       linkRow.append(
         node("span", (s.used == null ? "N/A" : size(s.used)) + " / " + (s.capacity == null ? "N/A" : size(s.capacity))),
-        node("strong", netBytes == null ? "N/A" : size(netBytes)),
+        node("strong", shared ? sharedNetworkText(s.lab) : netBytes == null ? "N/A" : size(netBytes)),
       );
       foot.append(linkRow);
       card.append(foot);
@@ -456,6 +476,10 @@
     el("lab-users-panel").hidden = !selectedLab;
     el("lab-users-title").textContent =
       d.disks.find((s) => s.lab === selectedLab)?.title || "";
+    const scopeNote = el("lab-users-panel").querySelector(":scope > p.muted");
+    if (scopeNote) scopeNote.textContent = t(sharedLab(selectedLab)
+      ? "공용 컨테이너 전체 사용량입니다. 개인별 점유율로 표시하지 않습니다."
+      : "CPU·메모리는 계정 환경 기준이며 GPU·연구실 디스크는 연구실 단위 공동 자원입니다.");
   }
   function render() {
     if (!data?.latest) {
@@ -643,6 +667,12 @@
         );
         button.onclick = () => open("account", a.lab + "/" + a.user);
         card.append(button);
+        if (sharedLab(a.lab)) {
+          card.append(node("p", t("개별 집계 미지원"), "metric-caption"));
+          card.append(node("p", t("공용 컨테이너 전체 사용량입니다. 개인별 점유율로 표시하지 않습니다."), "muted"));
+          users.append(card);
+          return;
+        }
         const p = h.map((row) => {
           const match = row.accounts.find((u) => u.user === a.user && u.lab === a.lab);
           return {
@@ -682,8 +712,17 @@
   }
   function renderNetwork(target, lab = null) {
     target.replaceChildren();
+    const sharedLabs = data.latest.disks.filter((s) =>
+      (lab === null || s.lab === lab) && sharedLab(s.lab));
+    sharedLabs.forEach((s) => {
+      const box = node("section", "", "metric-card");
+      box.append(node("strong", s.title + " · " + t("공용 컨테이너 전체 사용량")),
+        node("p", sharedNetworkText(s.lab)),
+        node("p", t("개별 집계 미지원"), "muted"));
+      target.append(box);
+    });
     const usage = (data.network_usage || []).filter(
-      (a) => lab === null || a.lab === lab,
+      (a) => (lab === null || a.lab === lab) && !sharedLab(a.lab),
     );
     const max = Math.max(1, ...usage.map((a) => a.rx + a.tx));
     usage.forEach((a) => {
@@ -832,11 +871,29 @@
       );
       if (!a) return;
       title = a.user + " · " + t("네트워크");
+      if (sharedLab(a.lab)) {
+        body.append(node("p", t("개별 집계 미지원")));
+        el("detail-title").textContent = title;
+        return;
+      }
       networkDetail(body, a);
     } else if (dialogKind === "account") {
       const a = d.accounts.find((a) => a.lab + "/" + a.user === selected);
       if (!a) return;
       title = a.user;
+      if (sharedLab(a.lab)) {
+        const list = node("dl", "", "detail-values");
+        row(list, "공용 컨테이너", t(a.running ? "실행 중" : "정지"));
+        for (const label of ["CPU 사용량", "메모리", "GPU", "네트워크", "디스크 읽기 / 쓰기", "주요 프로세스"]) {
+          row(list, label, t("개별 집계 미지원"));
+        }
+        body.append(list, node("p", t("공용 컨테이너 전체 사용량입니다. 개인별 점유율로 표시하지 않습니다."), "muted"));
+        const link = node("a", t("연구실"), "button");
+        link.href = "/labs/" + encodeURIComponent(a.lab);
+        body.append(link);
+        el("detail-title").textContent = title;
+        return;
+      }
       const list = node("dl", "", "detail-values");
       row(list, "상태", t(a.running ? "실행 중" : "정지"));
       row(
