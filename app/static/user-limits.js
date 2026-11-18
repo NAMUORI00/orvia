@@ -5,8 +5,21 @@
   const cpu = document.getElementById("cpu-value"),
     ram = document.getElementById("ram-value"),
     scopeSelect = document.querySelector("[data-limit-scope]"),
-    form = select.form;
+    form = select.form,
+    cpuPresets = [...document.querySelectorAll("[data-cpu-preset]")],
+    ramPresets = [...document.querySelectorAll("[data-ram-preset]")],
+    cpuSlider = document.querySelector('[data-pair="cpu-value"]'),
+    ramSlider = document.querySelector('[data-pair="ram-value"]');
   const trText = (s) => (typeof tr === "function" ? tr(s) : s);
+
+  function syncPresetHighlights() {
+    cpuPresets.forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.cpuPreset) === Number(cpu.value));
+    });
+    ramPresets.forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.ramPreset) === Number(ram.value));
+    });
+  }
 
   function render() {
     const isAll = scopeSelect?.value === "all";
@@ -78,6 +91,12 @@
       }
     });
 
+    form.dataset.limitTransition = anyReleasing
+      ? "release"
+      : anyShrinking
+        ? "shrink"
+        : "live";
+
     impact = !allValid
       ? "입력값 확인 필요"
       : !anyChanged
@@ -89,7 +108,24 @@
             : "한도 변경 · 재시작 없음";
     root.querySelector("[data-limit-impact]").textContent =
       (isAll ? trText("연구실 전체") : select.value) + " · " + trText(impact);
+    syncPresetHighlights();
   }
+
+  cpuPresets.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      cpu.value = btn.dataset.cpuPreset;
+      if (cpuSlider) cpuSlider.value = cpu.value;
+      cpu.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+
+  ramPresets.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ram.value = btn.dataset.ramPreset;
+      if (ramSlider) ramSlider.value = ram.value;
+      ram.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
 
   form.addEventListener("input", render);
   form.addEventListener("change", render);

@@ -209,6 +209,19 @@
 .twin-wires path.dimmed {
   opacity: 0.14;
 }
+.twin-wires circle.wire-end {
+  fill: #ffffff;
+  stroke: var(--lab-color, #94a3b8);
+  stroke-width: 2;
+  opacity: 0.72;
+  transition: opacity 0.16s ease;
+}
+.twin-wires circle.wire-end.active {
+  opacity: 1;
+}
+.twin-wires circle.wire-end.dimmed {
+  opacity: 0.16;
+}
 .twin-wires path.draft-wire {
   stroke: #117c6a;
   stroke-width: 2.75;
@@ -223,19 +236,19 @@
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 980px;
+  max-width: 1100px;
   margin: auto;
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  gap: 44px;
-  align-items: center;
+  grid-template-columns: 274px minmax(0, 1fr);
+  gap: 68px;
+  align-items: start;
 }
 .twin-workspace.is-split .twin-stage-grid {
-  grid-template-columns: 214px minmax(0, 1fr);
-  gap: 26px;
+  grid-template-columns: 238px minmax(0, 1fr);
+  gap: 52px;
 }
 .twin-workspace.is-split .lab-model-svg {
-  width: 40px;
+  width: 44px;
 }
 
 /* 2.5D Server Chassis Card */
@@ -282,11 +295,28 @@
   pointer-events: none;
 }
 
-/* GPU Slot Rows */
+/* GPU Slot Rows & Lane Sections */
 .gpu-slot-list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+}
+.gpu-lane-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #5b717c;
+  padding: 6px 2px 2px;
+  border-top: 1px dashed #d8e3e9;
+  margin-top: 4px;
+}
+.gpu-lane-divider:first-child {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
 }
 .gpu-slot-wrap {
   position: relative;
@@ -296,8 +326,8 @@
   background: #ffffff;
   border: 1px solid #dbe5eb;
   border-bottom: 2px solid #cbd9e1;
-  border-radius: 8px;
-  padding: 6px 14px 6px 10px;
+  border-radius: 9px;
+  padding: 7px 14px 7px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -317,6 +347,12 @@
   border-style: dashed;
   border-bottom-style: solid;
 }
+.gpu-slot-row.assigning {
+  border-style: solid;
+  border-color: #0d7463;
+  background: #e9f6f2;
+  box-shadow: 0 0 0 2px rgba(17, 124, 106, 0.22);
+}
 .gpu-slot-row.selected {
   border-color: var(--lab-color, #117c6a);
   background: #f5fbf9;
@@ -329,6 +365,13 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
+}
+.gpu-row-sub {
+  display: block;
+  font-size: 10px;
+  color: #6b808c;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .gpu-dot {
   width: 8px;
@@ -349,18 +392,27 @@
   font-size: 11px;
   color: #5b717c;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .gpu-assign-btn {
-  padding: 2px 7px;
-  border-radius: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
   background: #e6f3ef;
   color: #117c6a;
   font-size: 10.5px;
   font-weight: 700;
   border: 0;
+  white-space: nowrap;
+}
+.gpu-assign-btn.active {
+  background: #117c6a;
+  color: #ffffff;
 }
 .gpu-assign-btn:hover {
   background: #d2ebe4;
+}
+.gpu-assign-btn.active:hover {
+  background: #0d6355;
 }
 
 /* Connector Pins */
@@ -387,85 +439,46 @@
   transform: translateY(-50%) scale(1.3);
 }
 
-/* Click-to-Assign Popover */
-.gpu-popover {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 70;
-  width: 224px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+/* Inline Assign Banner Mode (Zero Overlapping Popovers) */
+.twin-map.is-assign-mode .lab-node-25d.can-assign {
+  border-color: #7cc5b6;
+  background: #fafdfc;
 }
-.gpu-slot-wrap:nth-last-child(-n + 3) .gpu-popover {
-  top: auto;
-  bottom: -4px;
-  transform: none;
-}
-.gpu-popover-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px 6px;
-  border-bottom: 1px solid #edf0f3;
-  font-size: 11.5px;
-  color: #122d34;
-}
-.gpu-popover-close {
-  background: none;
-  border: 0;
-  color: #72818e;
-  padding: 2px 5px;
-  font-size: 12px;
-}
-.gpu-popover-item {
+.inline-assign-btn {
+  margin-top: 8px;
   width: 100%;
-  background: transparent;
-  color: #203144;
-  border: 0;
-  border-radius: 7px;
-  padding: 7px 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #e6f5f0;
+  border: 1px dashed #0f7665;
+  color: #0e6354;
   font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-align: left;
-  white-space: normal;
-}
-.gpu-popover-item:hover {
-  background: #eff7f5;
-}
-.gpu-popover-item .gpu-dot {
-  flex-shrink: 0;
-}
-.gpu-popover-item span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gpu-popover-new {
-  width: 100%;
-  background: #f5faf8;
-  color: #117c6a;
-  border: 0;
-  border-top: 1px solid #edf0f3;
-  border-radius: 7px;
-  padding: 7px 8px;
-  margin-top: 3px;
-  font-size: 11.5px;
   font-weight: 700;
-  text-align: left;
+  text-align: center;
+  cursor: pointer;
 }
-.gpu-popover-new:hover {
-  background: #e3f2ed;
+.inline-assign-btn:hover {
+  background: #117c6a;
+  color: #ffffff;
+  border-style: solid;
+}
+.lab-node-arch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eef6f4;
+  border: 1px solid #cce3dc;
+  color: #0e6b5c;
+  font-size: 10.5px;
+  font-weight: 600;
+  margin-top: 5px;
+}
+.lab-node-arch.is-separate {
+  background: #f2f5f8;
+  border-color: #dbe3e9;
+  color: #516672;
 }
 
 .host-specs {
@@ -488,29 +501,29 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Lab Nodes 2.5D Grid */
+/* Lab Nodes 1-Column Parallel Lane Stack */
 .twin-laboratories {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  align-content: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-content: start;
 }
 .twin-workspace.is-split .twin-laboratories {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 .lab-node-25d {
   position: relative;
   background: #ffffff;
   border: 1px solid #d5e1e9;
-  border-bottom: 4px solid #c4d4de;
+  border-bottom: 3px solid #c4d4de;
   border-radius: 14px;
-  padding: 13px 14px 11px;
-  box-shadow: 0 10px 22px -10px rgba(18, 45, 52, 0.12);
+  padding: 15px 18px 13px;
+  box-shadow: 0 8px 20px -10px rgba(18, 45, 52, 0.11);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 152px;
+  min-height: 128px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
@@ -534,7 +547,7 @@
 .lab-node-top {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
 }
 .lab-model-svg {
   width: 50px;
@@ -548,23 +561,22 @@
 }
 .lab-node-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
 }
 .lab-node-title-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
 }
 .lab-node-title-row strong {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #122d34;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.35;
 }
 .lab-util-badge {
   font-size: 10px;
@@ -1166,46 +1178,6 @@
 }
 
 /* Shared / Auxiliary Page Styles Retained Cleanly */
-.review-dialog {
-  width: min(470px, calc(100vw - 36px));
-  padding: 24px;
-  border: 1px solid #d9e4e8;
-  border-radius: 16px;
-  color: #233d4b;
-  box-shadow: 0 30px 80px #123b4450;
-}
-.review-dialog::backdrop {
-  background: #132f4060;
-}
-.review-dialog h2 {
-  margin-top: 0;
-}
-.review-dialog p {
-  line-height: 1.65;
-}
-.review-dialog dl {
-  display: grid;
-  grid-template-columns: 115px 1fr;
-  gap: 10px 12px;
-  padding: 14px;
-  background: #f1f6f7;
-  border-radius: 10px;
-}
-.review-dialog dt {
-  color: #6b808b;
-  font-size: 12px;
-}
-.review-dialog dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-weight: 600;
-  font-size: 12.5px;
-}
-.review-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
 .safe-edit {
   border: 1px solid #bde2d4;
   border-radius: 9px;
@@ -1485,11 +1457,6 @@
   }
   .twin-workspace.is-split .twin-stage-grid {
     grid-template-columns: 1fr;
-  }
-  .gpu-popover {
-    left: 8px;
-    top: calc(100% + 6px);
-    transform: none;
   }
 }
 @media (max-width: 600px) {

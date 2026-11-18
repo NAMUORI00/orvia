@@ -2,12 +2,52 @@
 {% block breadcrumb %}<span>Orvia</span><span class="crumb-sep" aria-hidden="true">/</span><a href="/containers">컨테이너 관리</a><span class="crumb-sep" aria-hidden="true">/</span><span>{{lab.title}}</span>{% endblock %}
 {% block content %}
 <a class="back-link" href="/containers">‹ 컨테이너 관리</a>
-<section class="page-head"><div><h1>{{lab.title}}</h1><p>컨테이너 관리</p></div><a class="button secondary" href="/labs/{{lab.id}}">연구실 상세 ›</a></section>
-<section class="card card-pad"><h2>작업 영향 범위</h2><p>중지·재시작·재생성은 해당 환경을 사용하는 계정의 접속과 작업에 영향을 줍니다.</p>
-{% for item in containers %}<div class="person-action"><strong>{{item.name}}</strong> · <span>{{'실행 중' if item.status=='running' else '중지' if item.status=='exited' else item.status}}</span><p><span>연결 계정</span>: {{item.accounts|length}} · {{item.accounts|join(', ')}}</p></div>{% endfor %}
-{% if current.account_layout=='shared' %}<p class="notice">공용 컨테이너 작업은 연결된 모든 계정에 함께 영향을 줍니다.</p>{% endif %}
-<p><span>관리 범위</span>: {{'편집 허용' if lab.writable else '조회 전용'}}</p></section>
-<nav class="section-pills" aria-label="컨테이너 관리 메뉴"><a href="/containers/{{lab.id}}" class="{{'active' if section=='maintenance' else ''}}">실행 환경 · 복구</a><a href="/containers/{{lab.id}}/images" class="{{'active' if section=='images' else ''}}">개발환경 · 이미지</a></nav>
+<section class="page-head">
+  <div>
+    <div class="cockpit-head-meta">
+      <span class="lab-id-pill">{{lab.id}}</span>
+      <span class="sig-badge {{'sig-safe' if lab.writable else 'sig-idle'}}">{{'편집 허용' if lab.writable else '조회 전용'}}</span>
+      <span class="sig-badge {{'sig-info' if current.account_layout=='shared' else 'sig-idle'}}">{{'공용 컨테이너' if current.account_layout=='shared' else '계정별 컨테이너'}}</span>
+    </div>
+    <h1>{{lab.title}}</h1>
+    <p>컨테이너 관리</p>
+  </div>
+  <a class="button secondary" href="/labs/{{lab.id}}">연구실 상세 ›</a>
+</section>
+
+<section class="card card-pad cockpit-section-gap">
+  <div class="cockpit-card-head">
+    <div>
+      <h2>작업 영향 범위</h2>
+      <p class="muted">중지·재시작·재생성은 해당 환경을 사용하는 계정의 접속과 작업에 영향을 줍니다.</p>
+    </div>
+  </div>
+  <div class="impact-hero-2col">
+    {% if current.account_layout == 'shared' %}
+    <div class="arch-schematic-wrap">
+      <img class="arch-schematic-svg" src="/static/models/lab-container.svg" alt="">
+    </div>
+    {% endif %}
+    <div class="container-hero-grid">
+      {% for item in containers %}
+      <div class="container-hero-tile">
+        <div class="container-hero-tile-head">
+          <strong>{{item.name}}</strong>
+          <span class="badge {{'running' if item.status=='running' else ''}}">{{'실행 중' if item.status=='running' else '중지' if item.status=='exited' else item.status}}</span>
+        </div>
+        <p><span>연결 계정</span>: {{item.accounts|length}} · {{item.accounts|join(', ')}}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% if current.account_layout=='shared' %}<p class="notice">공용 컨테이너 작업은 연결된 모든 계정에 함께 영향을 줍니다.</p>{% endif %}
+  <p class="muted"><span>관리 범위</span>: {{'편집 허용' if lab.writable else '조회 전용'}}</p>
+</section>
+
+<nav class="section-pills" aria-label="컨테이너 관리 메뉴">
+  <a href="/containers/{{lab.id}}" class="{{'active' if section=='maintenance' else ''}}">실행 환경 · 복구</a>
+  <a href="/containers/{{lab.id}}/images" class="{{'active' if section=='images' else ''}}">개발환경 · 이미지</a>
+</nav>
 {% if section=='maintenance' %}{% include 'lab_maintenance.html' %}{% else %}{% include 'container_images.html' %}{% endif %}
 <script src="/static/lab-configuration.js" defer></script>
 {% endblock %}

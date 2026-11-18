@@ -49,17 +49,17 @@
     <div class="twin-map-head">
       <div class="twin-map-title">
         <h2>자원 배치도</h2>
-        <span class="map-legend-inline">연결된 연구실 카드 선택 시 우측 패널에서 바로 관리</span>
+        <span class="map-legend-inline">왼쪽 GPU와 오른쪽 연구실이 1:1 병렬 레인으로 연결됩니다</span>
       </div>
       <div class="map-tools">
-        <button id="twin-reset" type="button" class="secondary btn-sm">전체 보기</button>
+        <button id="twin-reset" type="button" class="secondary btn-sm">전체 연결 보기</button>
       </div>
     </div>
 
     <div id="twin-pending-bar" class="pending-wire-bar" hidden>
       <span id="twin-pending-label"></span>
-      <button type="button" id="twin-pending-clear" class="pending-btn-muted">초기화</button>
-      <button type="button" id="twin-pending-apply" class="pending-btn-teal">배정 화면 열기</button>
+      <button type="button" id="twin-pending-clear" class="pending-btn-muted">취소</button>
+      <button type="button" id="twin-pending-apply" class="pending-btn-teal" hidden>배정 화면 열기</button>
     </div>
 
     <svg class="twin-wires" id="twin-wires" aria-hidden="true"></svg>

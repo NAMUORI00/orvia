@@ -770,6 +770,190 @@ footer {
   background: #ecf7f0;
   color: #1f6b4b;
 }
+
+/* Dynamic Warning Review Modal (v0.7.7) */
+.review-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid #d5e2e7;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #1c3540;
+  box-shadow: 0 28px 80px rgba(14, 42, 52, 0.28);
+}
+.review-dialog::backdrop {
+  background: rgba(14, 38, 48, 0.48);
+  backdrop-filter: blur(2px);
+}
+.review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.review-head-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.review-head-main h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #122d34;
+}
+.review-head-sub {
+  display: block;
+  font-size: 12px;
+  color: #5e7480;
+  margin-top: 2px;
+}
+.review-head-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: #eaf5f1;
+  color: #117c6a;
+}
+.review-head-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.review-head-icon.is-warn {
+  background: #fef4dd;
+  color: #b4690e;
+}
+.review-head-icon.is-crit {
+  background: #fdebed;
+  color: #be123c;
+}
+.review-head-icon.is-info {
+  background: #e8f3fb;
+  color: #0b659e;
+}
+.review-close-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: #f4f7f9;
+  border: 1px solid #dce5ea;
+  color: #526873;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.review-close-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.review-summary-dl {
+  display: grid;
+  grid-template-columns: 122px 1fr;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 13px 15px;
+  background: #f4f8f9;
+  border: 1px solid #e1eaee;
+  border-radius: 11px;
+}
+.review-summary-dl dt {
+  color: #607682;
+  font-size: 12px;
+  font-weight: 500;
+}
+.review-summary-dl dd {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #163039;
+  overflow-wrap: anywhere;
+}
+.review-callout-list {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+.review-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  border: 1px solid #d7e4e8;
+  background: #f6fafb;
+}
+.review-callout-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.review-callout-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.review-callout-body strong {
+  display: block;
+  font-size: 12.5px;
+  margin-bottom: 2px;
+}
+.review-callout-body p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.review-callout.is-safe {
+  border-color: #bce2d3;
+  background: #edf8f3;
+  color: #145b43;
+}
+.review-callout.is-safe .review-callout-icon {
+  background: #d4efe3;
+  color: #0e7254;
+}
+.review-callout.is-warn {
+  border-color: #f1d494;
+  background: #fff9ea;
+  color: #7c4d0c;
+}
+.review-callout.is-warn .review-callout-icon {
+  background: #fdecc4;
+  color: #a65c08;
+}
+.review-callout.is-crit {
+  border-color: #f3bcc6;
+  background: #fef1f3;
+  color: #961634;
+}
+.review-callout.is-crit .review-callout-icon {
+  background: #fbd6dd;
+  color: #be123c;
+}
+.review-callout.is-info {
+  border-color: #c2dff2;
+  background: #eff7fc;
+  color: #0f4f7d;
+}
+.review-callout.is-info .review-callout-icon {
+  background: #d8ecf9;
+  color: #0b659e;
+}
+.review-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.review-actions button.danger {
+  background: #c83333;
+  color: #ffffff;
+}
 .work-name {
   font-weight: 600;
   color: #304955;

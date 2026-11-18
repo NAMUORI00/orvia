@@ -13,7 +13,7 @@
   let activeTab = "summary"; // summary | accounts | resources | backups
   let createGpu = null;
   let hoveredLabId = null;
-  let popoverGpu = null;
+  let assigningGpu = null;
   let stagedGpu = null; // { gpu: number, labId: string }
   let dragging = null; // { gpu, x, y, targetLabId }
   let busy = false;
@@ -38,6 +38,26 @@
     for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
     return n;
   };
+  const svgCloseIcon = () => {
+    const svg = svgNode("svg", {
+      viewBox: "0 0 24 24",
+      width: 15,
+      height: 15,
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "2",
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+      "aria-hidden": "true",
+    });
+    svg.append(
+      svgNode("path", { d: "M18 6 6 18" }),
+      svgNode("path", { d: "m6 6 12 12" }),
+    );
+    return svg;
+  };
+  const vramGb = (usedMib, totalMib) =>
+    (Number(usedMib || 0) / 1024).toFixed(1) + " / " + Math.round(Number(totalMib || 0) / 1024) + " GB";
 
   const indices = (lab) => (lab.gpu_indices && lab.gpu_indices.length ? lab.gpu_indices : [Number(lab.gpu)]).map(Number);
   const owners = (gpuIdx) => data.labs.filter((l) => indices(l).includes(Number(gpuIdx)));
@@ -98,7 +118,7 @@
     mode = "lab";
     activeLabId = labId;
     activeTab = tab;
-    popoverGpu = null;
+    assigningGpu = null;
     if (!keepStaged && stagedGpu && stagedGpu.labId !== labId) stagedGpu = null;
     syncUrlState();
     renderStage();
@@ -109,7 +129,7 @@
     if (gpuIdx === null) { window.location.assign("/labs/add"); return; }
     mode = "create";
     activeLabId = null;
-    popoverGpu = null;
+    assigningGpu = null;
     stagedGpu = null;
     createGpu = gpuIdx;
     syncUrlState();
@@ -121,7 +141,7 @@
     mode = null;
     activeLabId = null;
     hoveredLabId = null;
-    popoverGpu = null;
+    assigningGpu = null;
     stagedGpu = null;
     syncUrlState();
     renderStage();
@@ -177,19 +197,39 @@
 
   function renderStage() {
     root.classList.toggle("is-split", mode !== null);
+    const mapEl = document.getElementById("twin-map");
+    mapEl?.classList.toggle("is-assign-mode", assigningGpu !== null);
+    const resetBtn = document.getElementById("twin-reset");
+    if (resetBtn) {
+      resetBtn.textContent = mode !== null ? t("패널 접기 · 넓게 보기") : t("전체 연결 보기");
+    }
     renderMetrics();
 
     const pendingBar = document.getElementById("twin-pending-bar");
-    if (stagedGpu) {
+    const pendingApply = document.getElementById("twin-pending-apply");
+    const pendingClear = document.getElementById("twin-pending-clear");
+    if (assigningGpu !== null) {
+      const lbl = document.getElementById("twin-pending-label");
+      lbl.replaceChildren(
+        rawEl("strong", "GPU " + assigningGpu),
+        document.createTextNode(" · "),
+        el("span", "오른쪽 연구실 카드의 연결 버튼을 선택하세요"),
+      );
+      if (pendingApply) pendingApply.hidden = true;
+      if (pendingClear) pendingClear.textContent = t("취소");
+      pendingBar.hidden = false;
+    } else if (stagedGpu) {
       const target = data.labs.find((l) => l.id === stagedGpu.labId);
       const lbl = document.getElementById("twin-pending-label");
       lbl.replaceChildren(
         rawEl("strong", "GPU " + stagedGpu.gpu),
-        document.createTextNode(" → "),
+        document.createTextNode(" -> "),
         rawEl("span", target ? target.title : stagedGpu.labId),
         document.createTextNode(" · "),
         el("span", "배정 대기"),
       );
+      if (pendingApply) pendingApply.hidden = false;
+      if (pendingClear) pendingClear.textContent = t("초기화");
       pendingBar.hidden = false;
     } else {
       pendingBar.hidden = true;
@@ -197,23 +237,43 @@
 
     const focusLabId = hoveredLabId || (mode === "lab" ? activeLabId : null);
 
-    // Build GPU slots (7..0)
+    // Build GPU slots sorted to match lab order (zero crossing wires) + separated free pool
     const gpuContainer = document.getElementById("twin-gpus");
     const gpuFragments = [];
-    for (const gpu of [...data.gpus].sort((a, b) => b.index - a.index)) {
+    const effectiveOwnerFor = (gpu) => {
+      if (stagedGpu && stagedGpu.gpu === gpu.index) {
+        return data.labs.find((l) => l.id === stagedGpu.labId) || owners(gpu.index)[0] || null;
+      }
+      return owners(gpu.index)[0] || null;
+    };
+    const assignedGpus = [];
+    const freeGpus = [];
+    for (const gpu of data.gpus) {
+      if (effectiveOwnerFor(gpu)) assignedGpus.push(gpu);
+      else freeGpus.push(gpu);
+    }
+    assignedGpus.sort((a, b) => {
+      const oa = effectiveOwnerFor(a);
+      const ob = effectiveOwnerFor(b);
+      const ia = oa ? data.labs.findIndex((l) => l.id === oa.id) : 9999;
+      const ib = ob ? data.labs.findIndex((l) => l.id === ob.id) : 9999;
+      return ia !== ib ? ia - ib : a.index - b.index;
+    });
+    freeGpus.sort((a, b) => a.index - b.index);
+
+    const appendGpuRow = (gpu) => {
       const wrap = document.createElement("div");
       wrap.className = "gpu-slot-wrap";
 
       const gpuOwners = owners(gpu.index);
-      const effectiveOwner =
-        stagedGpu && stagedGpu.gpu === gpu.index
-          ? data.labs.find((l) => l.id === stagedGpu.labId) || gpuOwners[0]
-          : gpuOwners[0];
+      const effectiveOwner = effectiveOwnerFor(gpu);
       const assigned = Boolean(effectiveOwner);
+      const isAssigning = assigningGpu === gpu.index;
       const highlighted =
-        focusLabId &&
-        (gpuOwners.some((o) => o.id === focusLabId) ||
-          (stagedGpu && stagedGpu.gpu === gpu.index && stagedGpu.labId === focusLabId));
+        isAssigning ||
+        (focusLabId &&
+          (gpuOwners.some((o) => o.id === focusLabId) ||
+            (stagedGpu && stagedGpu.gpu === gpu.index && stagedGpu.labId === focusLabId)));
 
       const row = document.createElement("div");
       row.dataset.gpuRow = String(gpu.index);
@@ -222,6 +282,7 @@
       row.className = "gpu-slot-row";
       if (effectiveOwner) row.classList.add(accentClass(effectiveOwner.id));
       if (!assigned) row.classList.add("idle");
+      if (isAssigning) row.classList.add("assigning");
       if (Number(gpu.util) > 0) row.classList.add("working");
       if (highlighted) row.classList.add("selected");
       if (focusLabId && !highlighted) row.classList.add("dimmed");
@@ -231,17 +292,26 @@
       );
 
       const left = el("div", null, "gpu-row-left");
-      left.append(el("span", null, "gpu-dot"), rawEl("strong", "GPU " + gpu.index));
+      const metaCol = document.createElement("div");
+      metaCol.append(
+        rawEl("strong", "GPU " + gpu.index),
+        rawEl("span", vramGb(gpu.used, gpu.total), "gpu-row-sub"),
+      );
+      left.append(el("span", null, "gpu-dot"), metaCol);
       row.append(left);
 
       if (assigned) {
         row.append(rawEl("span", gpu.util + "%", "gpu-util-val"));
       } else {
-        const assignBtn = el("button", "+ 배정", "gpu-assign-btn");
+        const assignBtn = el(
+          "button",
+          isAssigning ? "대상 선택" : "+ 배정",
+          "gpu-assign-btn" + (isAssigning ? " active" : ""),
+        );
         assignBtn.type = "button";
         assignBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          popoverGpu = popoverGpu === gpu.index ? null : gpu.index;
+          assigningGpu = assigningGpu === gpu.index ? null : gpu.index;
           renderStage();
         });
         row.append(assignBtn);
@@ -258,7 +328,7 @@
         if (assigned && effectiveOwner) {
           openLab(effectiveOwner.id, "resources");
         } else {
-          popoverGpu = popoverGpu === gpu.index ? null : gpu.index;
+          assigningGpu = assigningGpu === gpu.index ? null : gpu.index;
           renderStage();
         }
       });
@@ -276,28 +346,34 @@
             " · " +
             gpu.util +
             "%\n" +
-            gpu.used +
-            " / " +
-            gpu.total +
-            " MiB · " +
+            vramGb(gpu.used, gpu.total) +
+            " · " +
             gpu.temp +
             " °C",
         );
       }
 
       wrap.append(row);
-
-      if (popoverGpu === gpu.index) {
-        wrap.append(buildGpuPopover(gpu.index));
-      }
       gpuFragments.push(wrap);
+    };
+
+    if (assignedGpus.length) {
+      gpuFragments.push(el("div", "연구실 연결 슬롯", "gpu-lane-divider"));
+      assignedGpus.forEach(appendGpuRow);
+    }
+    if (freeGpus.length) {
+      gpuFragments.push(el("div", "미배정 여유 슬롯", "gpu-lane-divider"));
+      freeGpus.forEach(appendGpuRow);
     }
     gpuContainer.replaceChildren(...gpuFragments);
 
-    // Build Lab cards + dashed Create card
+    // Build 1-Column Parallel Lab cards + dashed Create card
     const labContainer = document.getElementById("twin-laboratories");
     const labFragments = [];
     for (const lab of data.labs) {
+      const cat = catalogLab(lab.id);
+      const isShared = cat?.account_layout === "shared";
+      const commonPort = lab.users[0]?.port;
       const card = document.createElement("article");
       const accent = accentClass(lab.id);
       const isSelected = mode === "lab" && activeLabId === lab.id;
@@ -306,7 +382,8 @@
         "lab-node-25d " +
         accent +
         (isSelected ? " selected" : "") +
-        (isDimmed ? " dimmed" : "");
+        (isDimmed ? " dimmed" : "") +
+        (assigningGpu !== null && lab.writable ? " can-assign" : "");
       card.dataset.labNode = lab.id;
       card.setAttribute("tabindex", "0");
       card.setAttribute("role", "button");
@@ -339,12 +416,16 @@
       titleRow.append(titleGrp, utilBadge);
 
       const idxs = indices(lab);
+      const archLabel = isShared
+        ? t("공용 컨테이너") + (commonPort ? " · " + t("포트") + " " + commonPort : "")
+        : t("개별 컨테이너") + " · " + lab.users.length;
+      const archChip = rawEl("span", archLabel, "lab-node-arch" + (isShared ? "" : " is-separate"));
       const sub = rawEl(
         "p",
         "GPU " + idxs.join(", ") + " · " + capGb(lab.storage_gb),
         "lab-node-sub",
       );
-      meta.append(titleRow, sub);
+      meta.append(titleRow, archChip, sub);
       top.append(img, meta);
 
       const storageWrap = el("div", null, "lab-storage-wrap");
@@ -353,7 +434,7 @@
         Math.max(0, Math.round((Number(lab.used_gb || 0) / Math.max(1, Number(lab.storage_gb || 1))) * 100)),
       );
       const sMeta = el("div", null, "lab-storage-meta");
-      sMeta.append(el("span", "연구실 디스크"), rawEl("span", pct + "%"));
+      sMeta.append(el("span", "연구실 디스크"), rawEl("span", capUsage(lab.used_gb) + " / " + capGb(lab.storage_gb) + " (" + pct + "%)"));
       const barSvg = svgNode("svg", {
         viewBox: "0 0 100 6",
         preserveAspectRatio: "none",
@@ -389,6 +470,20 @@
       foot.append(accBtn, resBtn, docBtn);
 
       card.append(top, storageWrap, foot);
+      if (assigningGpu !== null && lab.writable) {
+        const assignTargetBtn = rawEl(
+          "button",
+          "+ GPU " + assigningGpu + " " + t("연결"),
+          "inline-assign-btn",
+        );
+        assignTargetBtn.type = "button";
+        const targetGpu = assigningGpu;
+        assignTargetBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          stageAssignGpu(targetGpu, lab.id);
+        });
+        card.append(assignTargetBtn);
+      }
 
       card.addEventListener("pointerenter", () => {
         if (dragging) return;
@@ -417,10 +512,12 @@
     createCard.className = "lab-create-node";
     createCard.append(
       rawEl("span", "+", "lab-create-plus"),
-      el("strong", "연구실 추가"),
+      assigningGpu !== null
+        ? rawEl("strong", "GPU " + assigningGpu + " · " + t("새 연구실 추가"))
+        : el("strong", "연구실 추가"),
       rawEl("span", t("미배정 GPU") + " " + freeCount + " " + t("사용 가능")),
     );
-    createCard.addEventListener("click", () => openCreate(null));
+    createCard.addEventListener("click", () => openCreate(assigningGpu));
     labFragments.push(createCard);
 
     labContainer.replaceChildren(...labFragments);
@@ -442,49 +539,10 @@
     drawWires();
   }
 
-  function buildGpuPopover(gpuIdx) {
-    const pop = el("div", null, "gpu-popover");
-    const head = el("div", null, "gpu-popover-head");
-    head.append(rawEl("strong", "GPU " + gpuIdx + " · " + t("배정")));
-    const closeBtn = rawEl("button", "✕", "gpu-popover-close");
-    closeBtn.type = "button";
-    closeBtn.setAttribute("aria-label", t("닫기"));
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      popoverGpu = null;
-      renderStage();
-    });
-    head.append(closeBtn);
-    pop.append(head);
-
-    for (const lab of data.labs) {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "gpu-popover-item";
-      const dot = el("span", null, "gpu-dot " + accentClass(lab.id));
-      const label = rawEl("span", lab.title);
-      item.append(dot, label);
-      item.addEventListener("click", (e) => {
-        e.stopPropagation();
-        stageAssignGpu(gpuIdx, lab.id);
-      });
-      pop.append(item);
-    }
-
-    const newBtn = el("button", "+ 이 GPU로 연구실 생성", "gpu-popover-new");
-    newBtn.type = "button";
-    newBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openCreate(gpuIdx);
-    });
-    pop.append(newBtn);
-    return pop;
-  }
-
   function bindPinDrag(pin, gpuIdx) {
     pin.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
-      popoverGpu = null;
+      assigningGpu = null;
       dragging = { gpu: gpuIdx, x: e.clientX, y: e.clientY, targetLabId: null };
       pin.setPointerCapture(e.pointerId);
 
@@ -551,18 +609,23 @@
         if (!startBox) continue;
         const x = startBox.left + (gPin ? startBox.width / 2 : startBox.width) - r.left;
         const y = startBox.top + startBox.height / 2 - r.top;
-        const cp = Math.max(36, (tx - x) * 0.48);
+        const cp = Math.max(22, Math.abs(tx - x) * 0.48);
 
         const p = svgNode("path", {
           d: `M ${x} ${y} C ${x + cp} ${y}, ${tx - cp} ${ty}, ${tx} ${ty}`,
         });
-        p.classList.add(accentClass(lab.id));
-        if (focusLabId === lab.id) p.classList.add("active");
-        else if (focusLabId) p.classList.add("dimmed");
+        const accent = accentClass(lab.id);
+        p.classList.add(accent);
+        const isActive = focusLabId === lab.id;
+        const isDim = Boolean(focusLabId && focusLabId !== lab.id);
+        if (isActive) p.classList.add("active");
+        else if (isDim) p.classList.add("dimmed");
         if (stagedGpu && stagedGpu.gpu === idx && stagedGpu.labId === lab.id) {
           p.classList.add("draft-wire");
         }
-        paths.push(p);
+        const c1 = svgNode("circle", { cx: x, cy: y, r: 3.2, class: "wire-end " + accent + (isActive ? " active" : isDim ? " dimmed" : "") });
+        const c2 = svgNode("circle", { cx: tx, cy: ty, r: 3.2, class: "wire-end " + accent + (isActive ? " active" : isDim ? " dimmed" : "") });
+        paths.push(p, c1, c2);
       }
     }
 
@@ -643,9 +706,11 @@
     fullLink.className = "split-full-link";
     fullLink.href = "/labs/" + encodeURIComponent(lab.id);
     fullLink.textContent = t("전체 보기") + " ›";
-    const closeBtn = rawEl("button", "✕", "split-close-btn");
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "split-close-btn";
     closeBtn.type = "button";
     closeBtn.setAttribute("aria-label", t("닫기"));
+    closeBtn.append(svgCloseIcon());
     closeBtn.addEventListener("click", closePanel);
     actions.append(fullLink, closeBtn);
     top.append(titleBox, actions);
@@ -817,9 +882,10 @@
       hiddenInput("csrf", csrf),
       hiddenInput("action", "account_create"),
       hiddenInput("lab", lab.id),
+      hiddenInput("confirm", lab.id),
       hiddenInput("next", nextUrl),
     );
-    if (uniqueContainers.length > 1) {
+    if (cat?.account_layout !== "shared" && uniqueContainers.length > 1) {
       const lbl = el("label", "기준 개발환경");
       const sel = document.createElement("select");
       sel.name = "user";
@@ -843,15 +909,6 @@
     c1.append(el("label", "새 계정 ID"), inNewUser);
 
     const c2 = document.createElement("div");
-    const inDisp = document.createElement("input");
-    inDisp.name = "display_name";
-    inDisp.maxLength = 100;
-    inDisp.placeholder = t("사용자명");
-    c2.append(el("label", "사용자명"), inDisp);
-    row1.append(c1, c2);
-
-    const row2 = el("div", null, "panel-form-2col");
-    const c3 = document.createElement("div");
     const inPw = document.createElement("input");
     inPw.type = "password";
     inPw.name = "password";
@@ -860,14 +917,23 @@
     inPw.required = true;
     inPw.autocomplete = "new-password";
     inPw.placeholder = t("8자 이상");
-    c3.append(el("label", "새 비밀번호"), inPw);
+    c2.append(el("label", "새 비밀번호"), inPw);
+    row1.append(c1, c2);
+
+    const row2 = el("div", null, "panel-form-2col");
+    const c3 = document.createElement("div");
+    const inDisp = document.createElement("input");
+    inDisp.name = "display_name";
+    inDisp.maxLength = 100;
+    inDisp.placeholder = t("선택 입력");
+    c3.append(el("label", "사용자명"), inDisp);
 
     const c4 = document.createElement("div");
-    const inConf = document.createElement("input");
-    inConf.name = "confirm";
-    inConf.required = true;
-    inConf.placeholder = lab.id;
-    c4.append(el("label", "연구실 ID 확인"), inConf);
+    const inSid = document.createElement("input");
+    inSid.name = "student_id";
+    inSid.maxLength = 40;
+    inSid.placeholder = t("선택 입력");
+    c4.append(el("label", "학번"), inSid);
     row2.append(c3, c4);
 
     const addBtn = el("button", "계정 생성", "btn-sm");
@@ -989,13 +1055,15 @@
     gpuHead.append(el("strong", "GPU 배정"), makeSignalBadge(false, "환경 재생성 · 저장 자료 유지"));
     gpuCard.append(gpuHead);
 
+    const affected = lab.users.map((u) => u.name).join(", ");
     const gpuForm = document.createElement("form");
     gpuForm.method = "post";
     gpuForm.action = "/hot-action";
     gpuForm.className = "panel-inline-form";
     gpuForm.dataset.labTitle = lab.title;
     gpuForm.dataset.impact = t("연구실 환경 재생성");
-    gpuForm.dataset.submitLabel = t("배정 적용");
+    if (affected) gpuForm.dataset.affectedAccounts = affected;
+    gpuForm.dataset.submitLabel = t("경고 확인 및 적용");
     gpuForm.dataset.review = t(
       "이 연구실의 모든 사용자 접속과 실행 작업이 종료됩니다. 기존 저장공간과 개발환경은 유지됩니다.",
     );
@@ -1004,6 +1072,10 @@
       hiddenInput("csrf", csrf),
       hiddenInput("action", "gpu_reconfigure"),
       hiddenInput("lab", lab.id),
+      hiddenInput("confirm", lab.id),
+      hiddenInput("ack_downtime", "yes"),
+      hiddenInput("ack_recreate", "yes"),
+      hiddenInput("ack_shared", ""),
       hiddenInput("expected_fingerprint", cat?.fingerprint || ""),
       hiddenInput("next", nextUrl),
     );
@@ -1022,8 +1094,13 @@
       cb.checked = selectedGpus.has(g.index);
 
       const other = owners(g.index).filter((o) => o.id !== lab.id);
+      const otherTitles = other.map((o) => o.title).join(", ");
+      const isBusyOther = !idxs.includes(g.index) && (Number(g.util) > 0 || Number(g.used) > 32);
+      if (otherTitles) cb.dataset.ownerTitle = otherTitles;
+      cb.dataset.gpuBusy = isBusyOther ? "yes" : "no";
+
       const subText = other.length
-        ? other.map((o) => o.title).join(", ")
+        ? otherTitles
         : Number(g.util) > 0
           ? g.util + "%"
           : t("미배정");
@@ -1032,33 +1109,12 @@
       gpuGrid.append(pill);
     }
 
-    const mkCheck = (name, labelText, required = false) => {
-      const l = el("label", null, "check-label");
-      const i = document.createElement("input");
-      i.type = "checkbox";
-      i.name = name;
-      i.value = "yes";
-      if (required) i.required = true;
-      l.append(i, el("span", labelText));
-      return l;
-    };
-
-    const gpuConf = document.createElement("input");
-    gpuConf.name = "confirm";
-    gpuConf.required = true;
-    gpuConf.placeholder = lab.id;
-
-    const gpuSubmit = el("button", "GPU 변경 검토", "btn-sm");
+    const gpuSubmit = el("button", "GPU 변경 적용", "btn-sm");
     gpuSubmit.type = "submit";
     if (!lab.writable) gpuSubmit.disabled = true;
 
     gpuForm.append(
       gpuGrid,
-      mkCheck("ack_downtime", "실행 작업 중단 확인", true),
-      mkCheck("ack_recreate", "연구실 환경 재생성 확인", true),
-      mkCheck("ack_shared", "사용 중인 GPU의 공유 배정 확인", false),
-      el("label", "연구실 ID 확인"),
-      gpuConf,
       gpuSubmit,
     );
     gpuCard.append(gpuForm);
@@ -1093,6 +1149,7 @@
       hiddenInput("csrf", csrf),
       hiddenInput("action", "grow"),
       hiddenInput("lab", lab.id),
+      hiddenInput("confirm", lab.id),
       hiddenInput("next", nextUrl),
     );
 
@@ -1117,11 +1174,6 @@
       presets.append(b);
     }
 
-    const stConf = document.createElement("input");
-    stConf.name = "confirm";
-    stConf.required = true;
-    stConf.placeholder = lab.id;
-
     const stBtn = el("button", "저장공간 확장", "btn-sm");
     stBtn.type = "submit";
     stBtn.disabled = !lab.writable || lab.imported || curGb >= storageMax;
@@ -1130,8 +1182,6 @@
       presets,
       el("label", "확대 후 용량 (GB)"),
       sizeInput,
-      el("label", "연구실 ID 확인"),
-      stConf,
       stBtn,
     );
     stCard.append(stForm);
@@ -1160,13 +1210,14 @@
     limForm.className = "panel-inline-form";
     limForm.dataset.labTitle = lab.title;
     limForm.dataset.impact = t("메모리 축소 시 재시작");
+    if (affected) limForm.dataset.affectedAccounts = affected;
     limForm.dataset.review = t(
       "메모리 축소 또는 한도 해제 시 실행 작업과 접속이 종료됩니다. 저장 파일은 유지됩니다. 0은 제한 없음을 뜻합니다.",
     );
 
     const scopeHidden = hiddenInput("scope", isSharedLayout ? "one" : "all");
     const userWrap = document.createElement("div");
-    userWrap.hidden = !isSharedLayout;
+    userWrap.hidden = true;
 
     const catUsers = [];
     const seenU = new Set();
@@ -1224,14 +1275,32 @@
     ramDiv.append(el("label", "메모리 (GiB, 0=제한 없음)"), ramInp);
     limRow.append(cpuDiv, ramDiv);
 
-    const limConf = document.createElement("input");
-    limConf.name = "confirm";
-    limConf.required = true;
-    limConf.placeholder = lab.id;
-
-    const limBtn = el("button", "변경 검토", "btn-sm");
+    const limBtn = el("button", "한도 변경 적용", "btn-sm");
     limBtn.type = "submit";
     if (!lab.writable) limBtn.disabled = true;
+
+    const syncLimitTransition = () => {
+      const isAll = scopeHidden.value === "all";
+      const targetOpts = isAll
+        ? [...userSelect.options]
+        : userSelect.selectedOptions[0]
+          ? [userSelect.selectedOptions[0]]
+          : [];
+      const newCpu = Number(cpuInp.value);
+      const newRam = Number(ramInp.value);
+      let anyRelease = false;
+      let anyShrink = false;
+      for (const opt of targetOpts) {
+        const oldCpu = Number(opt.dataset.cpu || 0);
+        const oldRam = Number(opt.dataset.ram || 0);
+        if ((oldCpu > 0 && newCpu === 0) || (oldRam > 0 && newRam === 0)) {
+          anyRelease = true;
+        } else if (newRam > 0 && (oldRam === 0 || newRam < oldRam)) {
+          anyShrink = true;
+        }
+      }
+      limForm.dataset.limitTransition = anyRelease ? "release" : anyShrink ? "shrink" : "live";
+    };
 
     btnAll.addEventListener("click", () => {
       scopeHidden.value = "all";
@@ -1239,33 +1308,38 @@
       btnOne.classList.remove("active");
       userWrap.hidden = true;
       allDesc.hidden = false;
+      syncLimitTransition();
     });
     btnOne.addEventListener("click", () => {
       scopeHidden.value = "one";
       btnOne.classList.add("active");
       btnAll.classList.remove("active");
-      userWrap.hidden = false;
+      userWrap.hidden = isSharedLayout;
       allDesc.hidden = true;
+      syncLimitTransition();
     });
     userSelect.addEventListener("change", () => {
       const opt = userSelect.selectedOptions[0];
       if (!opt) return;
       cpuInp.value = opt.dataset.cpu || "0";
       ramInp.value = opt.dataset.ram || "0";
+      syncLimitTransition();
     });
+    cpuInp.addEventListener("input", syncLimitTransition);
+    ramInp.addEventListener("input", syncLimitTransition);
+    syncLimitTransition();
 
     limForm.append(
       hiddenInput("csrf", csrf),
       hiddenInput("action", "resources"),
       hiddenInput("lab", lab.id),
+      hiddenInput("confirm", lab.id),
+      hiddenInput("ack_downtime", ""),
       hiddenInput("next", nextUrl),
       scopeHidden,
       isSharedLayout ? document.createTextNode("") : allDesc,
       userWrap,
       limRow,
-      mkCheck("ack_downtime", "메모리 축소 시 재시작 · 한도 해제 시 재생성 허용", false),
-      el("label", "연구실 ID 확인"),
-      limConf,
       limBtn,
     );
     limCard.append(limForm);
@@ -1321,19 +1395,10 @@
       bf.method = "post";
       bf.action = "/hot-action";
       bf.className = "panel-inline-form";
-
-      const ackLbl = el("label", null, "check-label");
-      const ackCb = document.createElement("input");
-      ackCb.type = "checkbox";
-      ackCb.name = "consistency";
-      ackCb.value = "live";
-      ackCb.required = true;
-      ackLbl.append(ackCb, el("span", "무중단 파일 백업의 일관성 범위를 확인했습니다."));
-
-      const bConf = document.createElement("input");
-      bConf.name = "confirm";
-      bConf.required = true;
-      bConf.placeholder = lab.id;
+      bf.dataset.labTitle = lab.title;
+      bf.dataset.impact = t("무중단 라이브 백업");
+      bf.dataset.submitLabel = t("백업 시작");
+      bf.dataset.review = t("컨테이너 파일시스템과 영구 저장공간을 무중단으로 백업합니다.");
 
       const bSubmit = el("button", "백업 시작", "secondary btn-sm");
       bSubmit.type = "submit";
@@ -1343,11 +1408,10 @@
         hiddenInput("csrf", csrf),
         hiddenInput("action", "backup"),
         hiddenInput("lab", lab.id),
+        hiddenInput("confirm", lab.id),
+        hiddenInput("consistency", "live"),
         hiddenInput("user", lab.users[0].name),
         hiddenInput("next", nextUrl),
-        ackLbl,
-        el("label", "연구실 ID 확인"),
-        bConf,
         bSubmit,
       );
       bkpCard.append(bf);
@@ -1392,9 +1456,11 @@
     wizardLink.href =
       createGpu !== null ? "/labs/add/new?gpu=" + encodeURIComponent(createGpu) : "/labs/add/new";
     wizardLink.textContent = t("전체 마법사") + " ›";
-    const closeBtn = rawEl("button", "✕", "split-close-btn");
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "split-close-btn";
     closeBtn.type = "button";
     closeBtn.setAttribute("aria-label", t("닫기"));
+    closeBtn.append(svgCloseIcon());
     closeBtn.addEventListener("click", closePanel);
     actions.append(wizardLink, closeBtn);
     top.append(titleBox, actions);
@@ -1419,7 +1485,11 @@
         n.toString(16).padStart(2, "0"),
       ).join("");
 
-    form.append(hiddenInput("csrf", csrf), hiddenInput("image_mode", "official"));
+    form.append(
+      hiddenInput("csrf", csrf),
+      hiddenInput("image_mode", "official"),
+      hiddenInput("ack_shared", ""),
+    );
 
     const titleInp = document.createElement("input");
     titleInp.name = "title";
@@ -1454,20 +1524,16 @@
       rb.required = true;
       rb.checked = g.index === defaultIdx;
       const gOwners = owners(g.index);
+      const ownerTitles = gOwners.map((o) => o.title).join(", ");
+      if (ownerTitles) rb.dataset.ownerTitle = ownerTitles;
+      rb.dataset.gpuBusy = Number(g.util) > 0 || Number(g.used) > 32 ? "yes" : "no";
       pill.append(
         rb,
         rawEl("span", "GPU " + g.index),
-        rawEl("small", gOwners.length ? t("공유") : t("미배정")),
+        rawEl("small", gOwners.length ? ownerTitles : t("미배정")),
       );
       gpuGrid.append(pill);
     }
-
-    const ackSharedLbl = el("label", null, "check-label");
-    const ackSharedCb = document.createElement("input");
-    ackSharedCb.type = "checkbox";
-    ackSharedCb.name = "ack_shared";
-    ackSharedCb.value = "yes";
-    ackSharedLbl.append(ackSharedCb, el("span", "이미 배정된 GPU의 공유 사용 확인"));
 
     // Storage Selection
     const stInp = document.createElement("input");
@@ -1575,7 +1641,6 @@
       idInp,
       el("label", "배정 GPU"),
       gpuGrid,
-      ackSharedLbl,
       el("label", "공유 저장공간 (GB)"),
       stPresets,
       stInp,
@@ -1623,6 +1688,7 @@
   });
   document.getElementById("twin-reset")?.addEventListener("click", closePanel);
   document.getElementById("twin-pending-clear")?.addEventListener("click", () => {
+    assigningGpu = null;
     stagedGpu = null;
     renderStage();
     if (mode === "lab" && activeTab === "resources") renderPanel();
@@ -1631,16 +1697,10 @@
     if (stagedGpu) openLab(stagedGpu.labId, "resources", true);
   });
 
-  document.addEventListener("click", (e) => {
-    if (popoverGpu !== null && !e.target.closest(".gpu-popover") && !e.target.closest(".gpu-slot-row")) {
-      popoverGpu = null;
-      renderStage();
-    }
-  });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || document.querySelector("dialog[open]")) return;
-    if (popoverGpu !== null) {
-      popoverGpu = null;
+    if (assigningGpu !== null) {
+      assigningGpu = null;
       renderStage();
     } else if (mode !== null) {
       closePanel();

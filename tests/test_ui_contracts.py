@@ -253,3 +253,39 @@ class TemplateAndAssetContractTests(unittest.TestCase):
         ):
             self.assertIn(expected, rendered)
         self.assertFalse(any("\uac00" <= c <= "\ud7a3" for c in rendered))
+
+    def test_no_emojis_in_templates_js_css_or_svg(self):
+        emoji_re = re.compile(r"[\U0001F000-\U0001FAFF\u26A0\u26A1\u2705\u2728\u274C\u2B50]")
+        folders = [
+            ROOT / "app/templates",
+            ROOT / "app/static",
+            ROOT / "app/static/models",
+        ]
+        for folder in folders:
+            for path in sorted(folder.glob("*")):
+                if not path.is_file() or path.suffix not in {".html", ".js", ".css", ".svg"}:
+                    continue
+                text = path.read_text(encoding="utf-8")
+                with self.subTest(asset=path.name):
+                    self.assertIsNone(
+                        emoji_re.search(text),
+                        f"Emoji character found in {path.name}",
+                    )
+
+    def test_no_manual_consent_checkboxes_in_templates_or_js(self):
+        cb_re = re.compile(
+            r'<input\b[^>]*type=["\']checkbox["\'][^>]*name=["\'](?:ack_|consistency)',
+            re.IGNORECASE,
+        )
+        for path in sorted((ROOT / "app/templates").glob("*.html")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(template=path.name):
+                self.assertIsNone(
+                    cb_re.search(text),
+                    f"Manual consent checkbox found in {path.name}",
+                )
+        for path in sorted((ROOT / "app/static").glob("*.js")):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(js=path.name):
+                self.assertNotIn('i.type = "checkbox"', text)
+                self.assertNotIn("ackCb.type = \"checkbox\"", text)
